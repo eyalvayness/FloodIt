@@ -8,9 +8,10 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using FloodIt.Game;
 using FloodIt.Models;
 using FloodIt.Utils;
+using FloodIt.Core;
+using FloodIt.AI;
 
 namespace FloodIt.ViewModels
 {
@@ -21,8 +22,9 @@ namespace FloodIt.ViewModels
         int _size, _moves;
         readonly UniformGrid _container;
         readonly Channel<Brush> _channel;
-        Game.Game _game;
+        Game _game;
         CancellationTokenSource source;
+        QLearning _ai;
 
         public int Size
         {
@@ -47,10 +49,11 @@ namespace FloodIt.ViewModels
 
             Moves = 0;
             Size = (minSize + maxSize) / 2;
+            _ai = new QLearning(0.5, 0.99);
         }
 
         void Restart() => Size = _size;
-        void CreateNewGame()
+        async void CreateNewGame()
         {
             if (source != null)
             {
@@ -59,28 +62,66 @@ namespace FloodIt.ViewModels
             }
             source = new();
             while (_channel.Reader.TryRead(out Brush b));
-            _game = new Game.Game(_container, new CommandRectangleCreation(_channel.Writer), new GameSettings() { Size = Size });
+
+
+            var settings = new GameSettings() { Size = Size };
+            var rectCreation = new CommandRectangleCreation(_channel.Writer);
+
+            _container.Children.Clear();
+            for (int i = 0; i < settings.Count; i++)
+                _container.Children.Add(rectCreation.GetNewRectangle());
+
+            _game = new Game(GetBrush, SetBrush, settings);
             Moves = 0;
             _game.OnBrushPlayed += (e, b) => Moves++;
+
+            //var ai = new QLearning(0.1, 0.99);
             //_game.StartGame(new UserStrategy(_channel.Reader), source.Token);
-            Task.Run(async () =>
-            {
-                try
-                {
-                    bool won = await _game.StartGame(new UserStrategy(_channel.Reader), source.Token);
-                    if (won)
-                        System.Windows.MessageBox.Show("You won !", "GG", System.Windows.MessageBoxButton.OK);
-                }
-                catch (OperationCanceledException) { }
-                catch (Exception) { }
-            });
+            //Task.Run(async () =>
+            //{
+            //    try
+            //    {
+            //        var averageR = await _ai.LearnAsync(_game);
+            //        //bool won = await _game.StartGame(new UserStrategy(_channel.Reader), source.Token);
+            //        //if (won)
+            //        //    System.Windows.MessageBox.Show($"You won in {Moves} move(s)!", "GG", System.Windows.MessageBoxButton.OK);
+            //        System.Windows.MessageBox.Show($"The AI finished in {Moves} move(s)! With {averageR:0.##} as average reward!", "GG", System.Windows.MessageBoxButton.OK);
+            //        App.Current.Dispatcher.Invoke(CreateNewGame);
+            //    }
+            //    catch (OperationCanceledException) { }
+            //    catch (Exception) { }
+            //});        
+            try 
+            { 
+                bool won = await _game.StartGameAsync(new UserStrategy(_channel.Reader), colorAsync: true, cancellationToken: source.Token);
+                if (won)
+                    System.Windows.MessageBox.Show($"You won in {Moves} move(s)!", "GG", System.Windows.MessageBoxButton.OK);
+                //System.Windows.MessageBox.Show($"The AI finished in {Moves} move(s)! With {averageR:0.##} as average reward!", "GG", System.Windows.MessageBoxButton.OK);
+                //App.Current.Dispatcher.Invoke(CreateNewGame);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception) { }
         }
 
         bool CanChangeSize(object i) => i is string val && minSize <= Size + int.Parse(val) && Size + int.Parse(val) <= maxSize;
         void ChangeSize(object i) => Size += int.Parse(i as string);
+
+        Brush GetBrush(int index)
+        {
+            if (_container.Dispatcher.Thread == Thread.CurrentThread)
+                return (_container.Children[index] as Rectangle).Fill;
+            return _container.Dispatcher.Invoke(() => (_container.Children[index] as Rectangle).Fill);
+        }
+
+        void SetBrush(int index, Brush brush)
+        {
+            if (_container.Dispatcher.Thread == Thread.CurrentThread)
+                (_container.Children[index] as Rectangle).Fill = brush;
+            _container.Dispatcher.Invoke(() => (_container.Children[index] as Rectangle).Fill = brush);
+        }
     }
 
-    public class UserStrategy : IStrategy
+    public class UserStrategy : FloodIt.Core.Interfaces.IAsyncStrategy
     {
         readonly ChannelReader<Brush> _reader;
         
@@ -89,7 +130,7 @@ namespace FloodIt.ViewModels
             _reader = reader;
         }
 
-        public async Task<Brush> Play(GameState state, CancellationToken cancellationToken)
+        public async Task<Brush> PlayAsync(GameState state, CancellationToken cancellationToken)
         {
             await _reader.WaitToReadAsync(cancellationToken);
             Brush b = await _reader.ReadAsync(cancellationToken);
@@ -98,13 +139,12 @@ namespace FloodIt.ViewModels
         }
     }
 
-    public class BasicRectangleCreation : IRectangleCreation
+    public class BasicRectangleCreation : FloodIt.Core.Interfaces.IRectangleCreation
     {
-        public virtual Rectangle GetNewRectangle(Brush[] allBrushes)
+        public virtual Rectangle GetNewRectangle()
         {
-            Brush brush = allBrushes.Random();
-            var rect = new Rectangle() { Fill = brush };
-            
+            var rect = new Rectangle();
+
             return rect;
         }
     }
@@ -112,8 +152,7 @@ namespace FloodIt.ViewModels
     public class CommandRectangleCreation : BasicRectangleCreation
     {
         readonly ChannelWriter<Brush> _writer;
-
-        public Command<Brush> Command { get; }
+        public Command<Rectangle> Command { get; }
 
         public CommandRectangleCreation(ChannelWriter<Brush> writer)
         {
@@ -121,12 +160,12 @@ namespace FloodIt.ViewModels
             Command = new(Execute);
         }
 
-        async void Execute(Brush b) => await _writer.WriteAsync(b);
+        async void Execute(Rectangle r) => await _writer.WriteAsync(r.Fill);
 
-        public override Rectangle GetNewRectangle(Brush[] allBrushes)
+        public override Rectangle GetNewRectangle()
         {
-            Rectangle rect = base.GetNewRectangle(allBrushes);
-            rect.InputBindings.Add(new MouseBinding(Command, new MouseGesture(MouseAction.LeftClick)) { CommandParameter = rect.Fill });
+            Rectangle rect = base.GetNewRectangle();
+            rect.InputBindings.Add(new MouseBinding() { Command = Command, Gesture = new MouseGesture(MouseAction.LeftClick), CommandParameter = rect });
 
             return rect;
         }
