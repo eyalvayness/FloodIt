@@ -15,17 +15,17 @@ namespace FloodIt.AI
         {
             double alpha = 0.1; 
             double gamma = 0.9;
-            var ai = new QLearning(alpha, gamma);
+            GameSettings? settings = null;// new() { Size = 6 };// new() { Size = 6, UsedBrushes = new Brush[] { Brushes.Red, Brushes.Green, Brushes.Blue, Brushes.Yellow } };
+            var ai = new QLearning(alpha, gamma, settings);
 
             double average = 0;
             int nmax = 50;
             int batchSize = 1000;
-            string format = new string('0', nmax.ToString().Length);
+            //string format = new('0', nmax.ToString().Length);
 
-            GameSettings settings = null;// new() { Size = 6 };// new() { Size = 6, UsedBrushes = new Brush[] { Brushes.Red, Brushes.Green, Brushes.Blue, Brushes.Yellow } };
             for (int n = 0; n < nmax; n++)
             {
-                double r = ai.Learn(batch: batchSize, settings: settings);
+                double r = ai.Learn(batch: batchSize);
                 average += r;
                 Debug.WriteLine($"{n+1:00}/{nmax}: averageR = {r}");
             }

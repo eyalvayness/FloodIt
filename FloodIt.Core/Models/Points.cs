@@ -22,13 +22,13 @@ namespace FloodIt.Core.Models
             D = d;
         }
 
-        public static explicit operator DPoint(Point p) => new DPoint(p.X, p.Y, 0);
-        public static explicit operator Point(DPoint dp) => new Point(dp.X, dp.Y);
+        public static explicit operator DPoint(Point p) => new(p.X, p.Y, 0);
+        public static explicit operator Point(DPoint dp) => new(dp.X, dp.Y);
 
-        public override bool Equals(object obj) => obj is DPoint point && Equals(point);
-        public bool Equals(DPoint other) => X == other.X && Y == other.Y;
+        public override bool Equals(object? obj) => obj is DPoint point && Equals(point);
+        public bool Equals(DPoint? other) => other is not null && X == other.X && Y == other.Y;
         public static bool operator ==(DPoint left, DPoint right) => left.Equals(right);
         public static bool operator !=(DPoint left, DPoint right) => !(left == right);
-        public override int GetHashCode() => throw new NotImplementedException();
+        public override int GetHashCode() => X + Y + D;
     }
 }

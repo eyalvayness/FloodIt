@@ -22,9 +22,9 @@ namespace FloodIt.ViewModels
         int _size, _moves;
         readonly UniformGrid _container;
         readonly Channel<Brush> _channel;
-        Game _game;
-        CancellationTokenSource source;
-        QLearning _ai;
+        Game? _game;
+        CancellationTokenSource? source;
+        QLearning? _ai;
 
         public int Size
         {
@@ -49,7 +49,6 @@ namespace FloodIt.ViewModels
 
             Moves = 0;
             Size = (minSize + maxSize) / 2;
-            _ai = new QLearning(0.5, 0.99);
         }
 
         void Restart() => Size = _size;
@@ -61,7 +60,7 @@ namespace FloodIt.ViewModels
                 source.Dispose();
             }
             source = new();
-            while (_channel.Reader.TryRead(out Brush b));
+            while (_channel.Reader.TryRead(out Brush? _));
 
 
             var settings = new GameSettings() { Size = Size };
@@ -71,6 +70,7 @@ namespace FloodIt.ViewModels
             for (int i = 0; i < settings.Count; i++)
                 _container.Children.Add(rectCreation.GetNewRectangle());
 
+            _ai = new QLearning(0.5, 0.99, settings);
             _game = new Game(GetBrush, SetBrush, settings);
             Moves = 0;
             _game.OnBrushPlayed += (e, b) => Moves++;
@@ -103,25 +103,27 @@ namespace FloodIt.ViewModels
             catch (Exception) { }
         }
 
-        bool CanChangeSize(object i) => i is string val && minSize <= Size + int.Parse(val) && Size + int.Parse(val) <= maxSize;
-        void ChangeSize(object i) => Size += int.Parse(i as string);
+        bool CanChangeSize(object? i) => i is string val && minSize <= Size + int.Parse(val) && Size + int.Parse(val) <= maxSize;
+        void ChangeSize(object? i) => Size += int.Parse(i?.ToString() ?? throw new NullReferenceException());
 
+
+        Rectangle GetRectangleFromIndex(int index) => _container.Children[index] as Rectangle ?? throw new NullReferenceException();
         Brush GetBrush(int index)
         {
             if (_container.Dispatcher.Thread == Thread.CurrentThread)
-                return (_container.Children[index] as Rectangle).Fill;
-            return _container.Dispatcher.Invoke(() => (_container.Children[index] as Rectangle).Fill);
+                return GetRectangleFromIndex(index).Fill ?? throw new NullReferenceException();
+            return _container.Dispatcher.Invoke(() => GetRectangleFromIndex(index).Fill);
         }
 
         void SetBrush(int index, Brush brush)
         {
             if (_container.Dispatcher.Thread == Thread.CurrentThread)
-                (_container.Children[index] as Rectangle).Fill = brush;
-            _container.Dispatcher.Invoke(() => (_container.Children[index] as Rectangle).Fill = brush);
+                GetRectangleFromIndex(index).Fill = brush;
+            _container.Dispatcher.Invoke(() => GetRectangleFromIndex(index).Fill = brush);
         }
     }
 
-    public class UserStrategy : FloodIt.Core.Interfaces.IAsyncStrategy
+    public class UserStrategy : Core.Interfaces.IAsyncStrategy
     {
         readonly ChannelReader<Brush> _reader;
         
@@ -160,11 +162,15 @@ namespace FloodIt.ViewModels
             Command = new(Execute);
         }
 
-        async void Execute(Rectangle r) => await _writer.WriteAsync(r.Fill);
+        async void Execute(Rectangle? r)
+        {
+            _ = r ?? throw new NullReferenceException();
+            await _writer.WriteAsync(r.Fill);
+        }
 
         public override Rectangle GetNewRectangle()
         {
-            Rectangle rect = base.GetNewRectangle();
+            var rect = base.GetNewRectangle();
             rect.InputBindings.Add(new MouseBinding() { Command = Command, Gesture = new MouseGesture(MouseAction.LeftClick), CommandParameter = rect });
 
             return rect;

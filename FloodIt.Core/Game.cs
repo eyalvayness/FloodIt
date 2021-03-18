@@ -23,7 +23,7 @@ namespace FloodIt.Core
         readonly BrushGetter _getBrush;
         readonly BrushSetter _setBrush;
         //List<Rectangle> _rects => _conatiner.Children.OfType<Rectangle>().ToList();
-        public event EventHandler<Brush> OnBrushPlayed;
+        public event EventHandler<Brush>? OnBrushPlayed;
         GameState _currentState;
 
         public bool IsFinished
@@ -79,14 +79,14 @@ namespace FloodIt.Core
                 throw new ArgumentOutOfRangeException(null, $"{paramName} must be between {min} and {max}");
         }
 
-        public Game(BrushGetter getBrush, BrushSetter setBrush, GameSettings settings = null)
+        public Game(BrushGetter getBrush, BrushSetter setBrush, GameSettings? settings = null)
         {
             Settings = settings ?? new();
 
             _setBrush = setBrush;
             _getBrush = getBrush;
 
-            _currentState = new GameState(settings);
+            _currentState = new GameState(Settings);
             ApplyChanges();
         }
 

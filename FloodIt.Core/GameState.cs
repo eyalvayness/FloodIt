@@ -12,7 +12,7 @@ namespace FloodIt.Core
     public class GameState : IEquatable<GameState>
     {
         readonly Queue<List<Point>> _changes;
-        List<Point> _tempChanges;
+        List<Point>? _tempChanges;
         readonly Brush[,] _board;
         Brush[] _playableBrushes;
         readonly GameSettings _settings;
@@ -45,6 +45,7 @@ namespace FloodIt.Core
             _changes = new();
             _markedULZ = new();
             _settings = settings;
+            _playableBrushes = Array.Empty<Brush>();
             _simplifiedBoard = new byte[_settings.Count];
             _board = new Brush[_settings.Size, _settings.Size];
 
@@ -82,6 +83,7 @@ namespace FloodIt.Core
             _changes = new();
             _markedULZ = new();
             _settings = from._settings;
+            _playableBrushes = Array.Empty<Brush>();
             _simplifiedBoard = from._simplifiedBoard.ToArray();
             _board = new Brush[_settings.Size, _settings.Size];
 
@@ -93,7 +95,7 @@ namespace FloodIt.Core
             ComputePlayabelBrushes();
         }
 
-        internal List<Point> GetLastChanges() => _changes.Count == 0 ? null : _changes.Dequeue().ToList();
+        internal List<Point>? GetLastChanges() => _changes.Count == 0 ? null : _changes.Dequeue().ToList();
         void BeginBatch()
         {
             if (_tempChanges != null)
@@ -254,22 +256,22 @@ namespace FloodIt.Core
             return mark;
         }
 
-        public bool Equals(GameState state)
+        public bool Equals(GameState? state)
         {
             if (state is null)
                 return false;
             if (_settings.Size != state._settings.Size)
                 return false;
-            for (int index = 0; index < _settings.Size; index++)
+            for (int index = _settings.Size; index >= 0; index--)
                 if (_simplifiedBoard[index] != state._simplifiedBoard[index])
                     return false;
             return true;
         }
-        public override bool Equals(object obj) => Equals(obj as GameState);
+        public override bool Equals(object? obj) => Equals(obj as GameState);
         public override int GetHashCode()
         {
             //var hc = HashCode.Combine(_simplifiedBoard);
-            var hc = _simplifiedBoard.Sum(b => (int)b);
+            var hc = _simplifiedBoard.Sum(b => b);
             return hc;
         }
 

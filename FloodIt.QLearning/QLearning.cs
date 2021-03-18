@@ -16,40 +16,41 @@ namespace FloodIt.AI
         public double Alpha { get; }
         public double Gamma { get; }
         public Dictionary<GameState, Dictionary<Brush, double>> Q { get; }
+        public GameSettings Settings { get; }
         Learner QLearner { get; }
         Player QPlayer { get; }
 
-        public QLearning(double alpha, double gamma)
+        public QLearning(double alpha, double gamma, GameSettings? settings)
         {
             if (alpha is < 0 or > 1)
                 throw new ArgumentOutOfRangeException(nameof(alpha), $"{nameof(alpha)} must be between 0 and 1");
             if (gamma is < 0 or > 1)
                 throw new ArgumentOutOfRangeException(nameof(gamma), $"{nameof(gamma)} must be between 0 and 1");
 
+            Settings = settings ?? new();
             Alpha = alpha;
             Gamma = gamma;
             Q = new();
-            QLearner = new(Alpha, Gamma, Q);
-            QPlayer = new();
+            QLearner = new(this);
+            QPlayer = new(this);
         }
 
-        internal QLearning(double alpha, double gamma, Dictionary<GameState, Dictionary<Brush, double>> q) : this(alpha, gamma)
+        internal QLearning(double alpha, double gamma, GameSettings? settings, Dictionary<GameState, Dictionary<Brush, double>> q) : this(alpha, gamma, settings)
         {
             Q = q;
         }
 
-        public double Learn(int batch = 50, GameSettings settings = null)
+        public double Learn(int batch = 50)
         {
             double averageR = 0;
-            settings ??= new();
             for (int n = 0; n < batch; n++)
             {
                 QLearner.UpdateExplorationProb(n);
-                Brush[] board = new Brush[settings.Count];
+                Brush[] board = new Brush[Settings.Count];
                 Brush getter(int i) => board[i];
                 void setter(int i, Brush b) => board[i] = b;
                 
-                Game game = new(getter, setter, settings);
+                Game game = new(getter, setter, Settings);
 
                 double r = QLearner.Learn(game);
                 averageR += r;
@@ -59,29 +60,37 @@ namespace FloodIt.AI
             return averageR / batch;
         }
 
-        public async Task PlayAsync(BrushGetter getBrush, BrushSetter setBrush, GameSettings settings = null, CancellationToken cancellationToken = default)
+        //public void Save(string filename)
+        //{
+
+        //}
+
+        public async Task PlayAsync(BrushGetter getBrush, BrushSetter setBrush, CancellationToken cancellationToken = default)
         {
-            var game = new Game(getBrush, setBrush, settings);
+            var game = new Game(getBrush, setBrush, Settings);
             await game.StartGameAsync(QPlayer, colorAsync: true, cancellationToken: cancellationToken);
         }
 
         private class Learner : IStrategy
         {
-            public double Alpha { get; }
-            public double Gamma { get; }
-            public Dictionary<GameState, Dictionary<Brush, double>> Q { get; }
+            readonly WeakReference<QLearning> _parent;
+
+            QLearning Parent => _parent.TryGetTarget(out var parent) ? parent : throw new NullReferenceException($"{nameof(Parent)} has been collected by GC");
+            public double Alpha => Parent.Alpha;
+            public double Gamma => Parent.Gamma;
+            public Dictionary<GameState, Dictionary<Brush, double>> Q => Parent.Q;
+            public GameSettings Settings => Parent.Settings;
             public List<List<double>> Rewards { get; }
+            public List<double> CurrentRewards => Rewards[^1];
 
             readonly double _minExplorationProb = 0.01;
             readonly double explorationDecayProb = 0.03;
             readonly Random _rand;
             double explorationProb;
 
-            public Learner(double alpha, double gamma, Dictionary<GameState, Dictionary<Brush, double>> q)
+            public Learner(QLearning parent)
             {
-                Alpha = alpha;
-                Gamma = gamma;
-                Q = q;
+                _parent = new(parent);
                 Rewards = new();
                 _rand = new();
             }
@@ -93,7 +102,7 @@ namespace FloodIt.AI
             {
                 Rewards.Add(new());
                 game.StartGame(this);
-                return Rewards.Last().Average();
+                return CurrentRewards.Average();
             }
 
             Brush IStrategy.Play(GameState state)
@@ -102,7 +111,7 @@ namespace FloodIt.AI
                     Q.Add(state, new());
                 Dictionary<Brush, double> stateQ = Q[state];
 
-                Brush action = null;
+                Brush? action = null;
                 double actionValue = double.MinValue;
                 foreach (Brush b in state.PlayableBrushes)
                 {
@@ -119,8 +128,9 @@ namespace FloodIt.AI
                 if (_rand.NextDouble() < explorationProb)
                     action = state.PlayableBrushes.Random();
 
+                action ??= state.PlayableBrushes.Random();
                 var r = GetRewardForAction(state, action, out GameState newgs);
-                Rewards.Last().Add(r);
+                CurrentRewards.Add(r);
 
                 double max = 0;
                 if (!Q.ContainsKey(newgs))
@@ -142,7 +152,7 @@ namespace FloodIt.AI
                 int colors = oldState.PlayableBrushCount - newState.PlayableBrushCount;
                 int end = Convert.ToInt32(newState.IsFinished);
 
-                int b = -1;
+                double b = -1;
                 double uzlFact = 1;
                 double blobsFact = 1;
                 double colorsFact = 1.5;
@@ -155,11 +165,38 @@ namespace FloodIt.AI
 
         private class Player : IAsyncStrategy
         {
-            Task<Brush> IAsyncStrategy.PlayAsync(GameState state, CancellationToken cancellationToken)
+            readonly WeakReference<QLearning> _parent;
+
+            QLearning Parent => _parent.TryGetTarget(out var parent) ? parent : throw new NullReferenceException($"{nameof(Parent)} has been collected by GC");
+            public Dictionary<GameState, Dictionary<Brush, double>> Q => Parent.Q;
+            
+            public Player(QLearning parent)
+            {
+                _parent = new(parent);
+            }
+
+            async Task<Brush> IAsyncStrategy.PlayAsync(GameState state, CancellationToken cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                throw new NotImplementedException();
+                await Task.Delay(250, cancellationToken);
+                
+                if (!Q.ContainsKey(state))
+                    return state.PlayableBrushes.Random();
+
+                Brush? play = null;
+                double maxValue = double.MinValue;
+                var options = Q[state];
+                foreach (var brush in options.Keys)
+                {
+                    if (maxValue < options[brush])
+                    {
+                        maxValue = options[brush];
+                        play = brush;
+                    }
+                }
+
+                return play ?? state.PlayableBrushes.Random();
             }
         }
     }
