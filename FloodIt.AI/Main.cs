@@ -19,8 +19,8 @@ namespace FloodIt.AI
             var ai = new QLearning(alpha, gamma, settings);
 
             double average = 0;
-            int nmax = 50;
-            int batchSize = 1000;
+            int nmax = 1;// 50;
+            int batchSize = 10;//1000;
             //string format = new('0', nmax.ToString().Length);
 
             for (int n = 0; n < nmax; n++)
@@ -31,6 +31,10 @@ namespace FloodIt.AI
             }
             average /= nmax;
             Debug.WriteLine($"----- total average reward = {average} -----");
+
+            var filename = "AI.json";
+            ai.Save(filename);
+            var ai2 = QLearning.Load(filename);
         }
     }
 }

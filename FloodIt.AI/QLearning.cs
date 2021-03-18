@@ -8,6 +8,7 @@ using FloodIt.Core.Interfaces;
 using System.Linq;
 using System.Diagnostics;
 using FloodIt.Core.Utils;
+using System.Text.Json.Serialization;
 
 namespace FloodIt.AI
 {
@@ -60,10 +61,33 @@ namespace FloodIt.AI
             return averageR / batch;
         }
 
-        //public void Save(string filename)
-        //{
+        public void Save(string filename)
+        {
+            var opt = new System.Text.Json.JsonSerializerOptions()
+            {
+                WriteIndented = true
+            };
+            opt.Converters.Add(new JsonConverters.QLearningConverter());
+            opt.Converters.Add(new Core.JsonConverters.GameSettingsConverter());
+            var json = System.Text.Json.JsonSerializer.Serialize(this, opt);
 
-        //}
+            System.IO.File.WriteAllText(filename, json);
+        }
+
+        public static QLearning? Load(string filename)
+        {
+            var opt = new System.Text.Json.JsonSerializerOptions()
+            {
+                WriteIndented = true
+            };
+            opt.Converters.Add(new JsonConverters.QLearningConverter());
+            opt.Converters.Add(new Core.JsonConverters.GameSettingsConverter());
+
+            var json = System.IO.File.ReadAllText(filename);
+            var ai = System.Text.Json.JsonSerializer.Deserialize<QLearning>(json, opt);
+
+            return ai;
+        }
 
         public async Task PlayAsync(BrushGetter getBrush, BrushSetter setBrush, CancellationToken cancellationToken = default)
         {

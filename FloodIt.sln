@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FloodIt", "FloodIt\FloodIt.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FloodIt.Core", "FloodIt.Core\FloodIt.Core.csproj", "{0A0226EB-CDA7-48F4-B557-8D27EF899555}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FloodIt.AI", "FloodIt.QLearning\FloodIt.AI.csproj", "{0B678290-B420-4BE7-A655-FF2D318C6A1F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FloodIt.AI", "FloodIt.AI\FloodIt.AI.csproj", "{0B678290-B420-4BE7-A655-FF2D318C6A1F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
