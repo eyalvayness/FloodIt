@@ -17,7 +17,7 @@ namespace FloodIt.Core.JsonConverters
             bool? preventSameBrush = null;
             List<Brush> usedBrushes = new();
 
-            while (reader.Read())
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
             {
                 if (reader.TokenType == JsonTokenType.PropertyName)
                 {

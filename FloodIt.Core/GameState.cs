@@ -6,24 +6,29 @@ using FloodIt.Core.Models;
 using System.Windows.Media;
 using System.Linq;
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace FloodIt.Core
 {
-    public class GameState : IEquatable<GameState>
+    public class GameState : IEquatable<GameState>, IEquatable<byte[]>
     {
         readonly Queue<List<Point>> _changes;
         List<Point>? _tempChanges;
         readonly Brush[,] _board;
         Brush[] _playableBrushes;
+        byte[] _playableBytes;
         readonly GameSettings _settings;
         readonly List<List<Point>> _blobs;
         readonly List<DPoint> _markedULZ;
         readonly byte[] _simplifiedBoard;
+        readonly List<Brush> _conversionTable;
 
+        public byte[] SimplifiedBoard => _simplifiedBoard.ToArray();
         public int BlobCount => _blobs.Count;
         public bool IsFinished => BlobCount == 1;
         public int ULZCount => _markedULZ.Count;
         public Brush[] PlayableBrushes => _playableBrushes.ToArray();
+        public byte[] PlayableBytes => _playableBytes.ToArray();
         public int PlayableBrushCount => _playableBrushes.Length;
         public Brush this[int x, int y]
         {
@@ -45,6 +50,8 @@ namespace FloodIt.Core
             _changes = new();
             _markedULZ = new();
             _settings = settings;
+            _conversionTable = new();
+            _playableBytes = Array.Empty<byte>();
             _playableBrushes = Array.Empty<Brush>();
             _simplifiedBoard = new byte[_settings.Count];
             _board = new Brush[_settings.Size, _settings.Size];
@@ -61,19 +68,18 @@ namespace FloodIt.Core
             if (_settings.PreventSameBrush)
                 temp.Remove(this[0, 0]);
             _playableBrushes = temp.ToArray();
+            _playableBytes = _playableBrushes.Select(b => (byte)_conversionTable.IndexOf(b)).ToArray();
         }
 
         void CreateSimplifiedBoard()
         {
-            List<Brush> conversionTable = new();
-            
             for (int index = 0; index < _settings.Count; index++)
             {
                 int x = index % _settings.Size;
                 int y = index / _settings.Size;
-                if (!conversionTable.Contains(this[x, y]))
-                    conversionTable.Add(this[x, y]);
-                _simplifiedBoard[index] = (byte)conversionTable.IndexOf(this[x, y]);
+                if (!_conversionTable.Contains(this[x, y]))
+                    _conversionTable.Add(this[x, y]);
+                _simplifiedBoard[index] = (byte)_conversionTable.IndexOf(this[x, y]);
             }
         }
 
@@ -82,7 +88,9 @@ namespace FloodIt.Core
             _blobs = new();
             _changes = new();
             _markedULZ = new();
-            _settings = from._settings;
+            _conversionTable = new();
+             _settings = from._settings;
+            _playableBytes = Array.Empty<byte>();
             _playableBrushes = Array.Empty<Brush>();
             _simplifiedBoard = from._simplifiedBoard.ToArray();
             _board = new Brush[_settings.Size, _settings.Size];
@@ -120,6 +128,7 @@ namespace FloodIt.Core
             EndBatch();
         }
 
+        public Brush GetBrushFromByte(byte b) => _conversionTable[(int)b];
         public GameState PlayBrush(Brush b, bool usingDistance = true)
         {
             GameState newgs = new(this);
@@ -256,6 +265,17 @@ namespace FloodIt.Core
             return mark;
         }
 
+        public bool Equals(byte[]? other)
+        {
+            if (other == null)
+                return false;
+            if (other.Length != _settings.Count)
+                return false;
+            for (int index = _settings.Size; index >= 0; index--)
+                if (_simplifiedBoard[index] != other[index])
+                    return false;
+            return true;
+        }
         public bool Equals(GameState? state)
         {
             if (state is null)
@@ -274,8 +294,28 @@ namespace FloodIt.Core
             var hc = _simplifiedBoard.Sum(b => b);
             return hc;
         }
+        public static bool operator !=(GameState s, byte[] simplified) => !(s == simplified);
+        public static bool operator ==(GameState s, byte[] simplified) => s is not null && s.Equals(simplified);
 
         public static bool operator !=(GameState s1, GameState s2) => !(s1 == s2);
         public static bool operator ==(GameState s1, GameState s2) => s1 is not null && s1.Equals(s2);
+    }
+
+    public class SimplifiedBoardEqualityComparer : IEqualityComparer<byte[]>
+    {
+        public bool Equals(byte[]? x, byte[]? y)
+        {
+            if (x == null || y == null)
+                return false;
+            if (x.Length != y.Length)
+                return false;
+            for (int index = x.Length - 1; index >= 0; index--)
+                if (x[index] != y[index])
+                    return false;
+
+            return true;
+        }
+
+        public int GetHashCode([DisallowNull] byte[] obj) => obj.Sum(b => b);
     }
 }
