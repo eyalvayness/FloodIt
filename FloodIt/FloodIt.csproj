@@ -10,8 +10,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FloodIt.AI\FloodIt.AI.csproj" />
     <ProjectReference Include="..\FloodIt.Core\FloodIt.Core.csproj" />
-    <ProjectReference Include="..\FloodIt.QLearning\FloodIt.AI.csproj" />
   </ItemGroup>
 
   <ItemGroup>

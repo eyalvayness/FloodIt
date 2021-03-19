@@ -10,6 +10,7 @@ using System.Diagnostics;
 using FloodIt.Core.Utils;
 using System.Text.Json.Serialization;
 using System.Text.Json;
+using System.Text;
 
 namespace FloodIt.AI
 {
@@ -19,7 +20,7 @@ namespace FloodIt.AI
 
         public double Alpha { get; }
         public double Gamma { get; }
-        public Dictionary<byte[], Dictionary<byte, double>> Q { get; }
+        public Dictionary<byte[], double[]> Q { get; }
         public GameSettings Settings { get; }
         Learner QLearner { get; }
         Player QPlayer { get; }
@@ -49,7 +50,7 @@ namespace FloodIt.AI
             QPlayer = new(this);
         }
 
-        internal QLearning(double alpha, double gamma, GameSettings? settings, Dictionary<byte[], Dictionary<byte, double>> q) : this(alpha, gamma, settings)
+        internal QLearning(double alpha, double gamma, GameSettings? settings, Dictionary<byte[], double[]> q) : this(alpha, gamma, settings)
         {
             Q = q;
         }
@@ -102,7 +103,7 @@ namespace FloodIt.AI
             QLearning Parent => _parent.TryGetTarget(out var parent) ? parent : throw new NullReferenceException($"{nameof(Parent)} has been collected by GC");
             public double Alpha => Parent.Alpha;
             public double Gamma => Parent.Gamma;
-            public Dictionary<byte[], Dictionary<byte, double>> Q => Parent.Q;
+            public Dictionary<byte[], double[]> Q => Parent.Q;
             public GameSettings Settings => Parent.Settings;
             public List<List<double>> Rewards { get; }
             public List<double> CurrentRewards => Rewards[^1];
@@ -125,22 +126,27 @@ namespace FloodIt.AI
             {
                 Rewards.Add(new());
                 game.StartGame(this);
+                var mOne = CurrentRewards.Count(d => d == -1);
                 return CurrentRewards.Count > 0 ? CurrentRewards.Average() : 0;
             }
 
             Brush IStrategy.Play(GameState state)
             {
+                bool boardCreation = false;
+                bool random = false;
+
                 if (!Q.ContainsKey(state.SimplifiedBoard))
-                    Q.Add(state.SimplifiedBoard, new());
+                {
+                    boardCreation = true;
+                    Q.Add(state.SimplifiedBoard, new double[Settings.UsedBrushes.Length - 1]);
+                }
                 var stateQ = Q[state.SimplifiedBoard];
 
                 byte? action = null;
                 double actionValue = double.MinValue;
                 foreach (byte b in state.PlayableBytes)
                 {
-                    if (!stateQ.ContainsKey(b))
-                        stateQ.Add(b, 0);
-                    double qValue = stateQ[b];
+                    double qValue = stateQ[b - 1];
 
                     if (actionValue <= qValue)
                     {
@@ -149,7 +155,10 @@ namespace FloodIt.AI
                     }
                 }
                 if (_rand.NextDouble() < explorationProb)
+                {
+                    random = true;
                     action = state.PlayableBytes.Random();
+                }
 
                 var actionByte = action ?? state.PlayableBytes.Random();
                 var actionBrush = state.GetBrushFromByte(actionByte);
@@ -157,13 +166,17 @@ namespace FloodIt.AI
                 CurrentRewards.Add(r);
 
                 double max = 0;
-                if (!Q.ContainsKey(newgs.SimplifiedBoard))
-                    Q.Add(newgs.SimplifiedBoard, new());
-                foreach (var val in Q[newgs.SimplifiedBoard].Values)
-                    if (max <= val)
-                        max = val;
+                if (Q.ContainsKey(newgs.SimplifiedBoard))
+                {
+                    max = double.MinValue;
+                    foreach (var val in Q[newgs.SimplifiedBoard])
+                        if (max <= val)
+                            max = val;
+                }
 
-                Q[state.SimplifiedBoard][actionByte] = (1 - Alpha) * Q[state.SimplifiedBoard][actionByte] + Alpha * (r + Gamma * max);
+                stateQ[actionByte - 1] = (1 - Alpha) * stateQ[actionByte - 1] + Alpha * (r + Gamma * max);
+
+                var trace = new { State = stateQ, Board = boardCreation, B = actionByte, R = r, Random = random };
                 return actionBrush;
             }
 
@@ -192,7 +205,7 @@ namespace FloodIt.AI
             readonly WeakReference<QLearning> _parent;
 
             QLearning Parent => _parent.TryGetTarget(out var parent) ? parent : throw new NullReferenceException($"{nameof(Parent)} has been collected by GC");
-            public Dictionary<byte[], Dictionary<byte, double>> Q => Parent.Q;
+            public Dictionary<byte[], double[]> Q => Parent.Q;
             
             public Player(QLearning parent)
             {
@@ -211,12 +224,12 @@ namespace FloodIt.AI
                 byte? play = null;
                 double maxValue = double.MinValue;
                 var options = Q[state.SimplifiedBoard];
-                foreach (var brush in options.Keys)
+                for (int i = 0; i < options.Length; i++)
                 {
-                    if (maxValue < options[brush])
+                    if (maxValue < options[i])
                     {
-                        maxValue = options[brush];
-                        play = brush;
+                        maxValue = options[i];
+                        play = (byte)(i + 1);
                     }
                 }
 

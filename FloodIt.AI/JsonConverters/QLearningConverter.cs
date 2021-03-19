@@ -18,7 +18,7 @@ namespace FloodIt.AI.JsonConverters
 
             double? alpha = null, gamma = null;
             Core.GameSettings? settings = null;
-            Dictionary<byte[], Dictionary<byte, double>>? q = null;
+            Dictionary<byte[], double[]>? q = null;
 
             while (reader.Read())
             {
@@ -42,21 +42,27 @@ namespace FloodIt.AI.JsonConverters
                             if (reader.TokenType == JsonTokenType.PropertyName)
                             {
                                 var s = reader.GetString() ?? throw new NullReferenceException();
-                                var board = Convert.FromBase64String(s);
+                                var board = Convert.FromBase64String(s) ?? throw new NullReferenceException();
 
-                                var dict = new Dictionary<byte, double>();
-                                q.Add(board, dict);
+                                //if (settings != null)
+                                //{
+                                //    while (board.Length != settings.UsedBrushes.Length - 1)
+                                //    {
+                                //        board = board.Prepend((byte)0).ToArray();
+                                //    }
+                                //}
+
+                                var list = new List<double>();
                                 while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                                 {
-                                    if (reader.TokenType == JsonTokenType.PropertyName)
+                                    if (reader.TokenType == JsonTokenType.Number)
                                     {
-                                        var b = reader.GetString() ?? throw new NullReferenceException();
-                                        reader.Read();
                                         var d = reader.GetDouble();
 
-                                        dict.Add(byte.Parse(b), d);
+                                        list.Add(d);
                                     }
                                 }
+                                q.Add(board, list.ToArray());
                             }
                         }
                     }
@@ -89,11 +95,9 @@ namespace FloodIt.AI.JsonConverters
             {
                 writer.WriteStartObject();
                 writer.WriteStartArray(Convert.ToBase64String(kvp.Key));
-                foreach (var kvp2 in kvp.Value)
+                foreach (var bytes in kvp.Value)
                 {
-                    writer.WriteStartObject();
-                    writer.WriteNumber(kvp2.Key.ToString(), kvp2.Value);
-                    writer.WriteEndObject();
+                    writer.WriteNumberValue(bytes);
                 }
                 writer.WriteEndArray();
                 writer.WriteEndObject();
