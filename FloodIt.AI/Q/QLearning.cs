@@ -12,30 +12,18 @@ using System.Text.Json.Serialization;
 using System.Text.Json;
 using System.Text;
 
-namespace FloodIt.AI
+namespace FloodIt.AI.Q
 {
     public class QLearning
     {
-        static readonly JsonSerializerOptions _opt;
-
-        public double Alpha { get; }
-        public double Gamma { get; }
-        public Dictionary<byte[], double[]> Q { get; }
+        public float Alpha { get; }
+        public float Gamma { get; }
+        public Dictionary<byte[], float[]> Q { get; }
         public GameSettings Settings { get; }
         Learner QLearner { get; }
         Player QPlayer { get; }
 
-        static QLearning()
-        {
-            _opt = new JsonSerializerOptions()
-            {
-                WriteIndented = true
-            };
-            _opt.Converters.Add(new JsonConverters.QLearningConverter());
-            _opt.Converters.Add(new Core.JsonConverters.GameSettingsConverter());
-        }
-
-        public QLearning(double alpha, double gamma, GameSettings? settings)
+        public QLearning(float alpha, float gamma, GameSettings? settings)
         {
             if (alpha is < 0 or > 1)
                 throw new ArgumentOutOfRangeException(nameof(alpha), $"{nameof(alpha)} must be between 0 and 1");
@@ -50,44 +38,66 @@ namespace FloodIt.AI
             QPlayer = new(this);
         }
 
-        internal QLearning(double alpha, double gamma, GameSettings? settings, Dictionary<byte[], double[]> q) : this(alpha, gamma, settings)
+        [JsonConstructor]
+        internal QLearning(float alpha, float gamma, GameSettings? settings, Dictionary<byte[], float[]> q) : this(alpha, gamma, settings)
         {
             Q = q;
         }
 
-        public double Learn(int batch = 50)
+        public float Learn(int batch = 50)
         {
-            double averageR = 0;
+            List<float> rTrace = new();
+            float averageR = 0;
             for (int n = 0; n < batch; n++)
             {
                 QLearner.UpdateExplorationProb(n);
                 Brush[] board = new Brush[Settings.Count];
                 Brush getter(int i) => board[i];
                 void setter(int i, Brush b) => board[i] = b;
-                
+
                 Game game = new(getter, setter, Settings);
 
-                double r = QLearner.Learn(game);
+                float r = QLearner.Learn(game);
                 averageR += r;
+                rTrace.Add(r);
             }
 
+            var ordered = rTrace.OrderBy(d => d).ToArray();
+            var negs = rTrace.Where(d => d < 0).ToList();
+            var bads = rTrace.Where(d => 0 <= d && d < 1).ToList();
+            var goods = rTrace.Where(d => 1 <= d && d < 2).ToList();
+            var greats = rTrace.Where(d => 2 <= d).ToList();
+
+            var median = (ordered[(ordered.Length - 1) / 2] + ordered[ordered.Length / 2]) / 2;
+            Debug.WriteLine($"N = {negs.Count}, B = {bads.Count}, Go = {goods.Count}, Gr = {greats.Count}, Med = {median}");
             return averageR / batch;
         }
 
-        public string Save(string filename)
+        public string Save(string filename, bool writeIndented = false)
         {
-            var json = JsonSerializer.Serialize(this, _opt);
+            var opt = GetSerializerOptions(writeIndented);
+            var json = JsonSerializer.Serialize(this, opt);
 
             System.IO.File.WriteAllText(filename, json);
             return json;
         }
-
-        public static QLearning? Load(string filename)
+        public static QLearning? Load(string filename, bool writeIndented = false)
         {
+            var opt = GetSerializerOptions(writeIndented);
             var json = System.IO.File.ReadAllText(filename);
-            var ai = JsonSerializer.Deserialize<QLearning>(json, _opt);
+            var ai = JsonSerializer.Deserialize<QLearning>(json, opt);
 
             return ai;
+        }
+        static JsonSerializerOptions GetSerializerOptions(bool writeIndented)
+        {
+            var opt = new JsonSerializerOptions()
+            {
+                WriteIndented = writeIndented
+            };
+            opt.Converters.Add(new JsonConverters.QLearningConverter());
+            opt.Converters.Add(new Core.JsonConverters.GameSettingsConverter());
+            return opt;
         }
 
         public async Task PlayAsync(BrushGetter getBrush, BrushSetter setBrush, CancellationToken cancellationToken = default)
@@ -101,15 +111,15 @@ namespace FloodIt.AI
             readonly WeakReference<QLearning> _parent;
 
             QLearning Parent => _parent.TryGetTarget(out var parent) ? parent : throw new NullReferenceException($"{nameof(Parent)} has been collected by GC");
-            public double Alpha => Parent.Alpha;
-            public double Gamma => Parent.Gamma;
-            public Dictionary<byte[], double[]> Q => Parent.Q;
-            public GameSettings Settings => Parent.Settings;
-            public List<List<double>> Rewards { get; }
-            public List<double> CurrentRewards => Rewards[^1];
+            public float Alpha => Parent.Alpha;
+            public float Gamma => Parent.Gamma;
+            public Dictionary<byte[], float[]> Q => Parent.Q;
+            public int BrushesCount => Parent.Settings.UsedBrushes.Length;
+            public List<List<float>> Rewards { get; }
+            public List<float> CurrentRewards => Rewards[^1];
 
-            readonly double _minExplorationProb = 0.01;
-            readonly double explorationDecayProb = 0.03;
+            readonly float _minExplorationProb = 0.0005f;//0.005;//0.01;
+            readonly float explorationProbDecay = 0.3f;//0.1;//0.03;
             readonly Random _rand;
             double explorationProb;
 
@@ -120,9 +130,9 @@ namespace FloodIt.AI
                 _rand = new();
             }
 
-            internal void UpdateExplorationProb(int n) => explorationProb = Math.Max(_minExplorationProb, Math.Exp(-explorationDecayProb * n));
+            internal void UpdateExplorationProb(int n) => explorationProb = Math.Max(_minExplorationProb, Math.Exp(-explorationProbDecay * n));
 
-            public double Learn(Game game)
+            public float Learn(Game game)
             {
                 Rewards.Add(new());
                 game.StartGame(this);
@@ -134,13 +144,12 @@ namespace FloodIt.AI
             {
                 bool boardCreation = false;
                 bool random = false;
-
-                if (!Q.ContainsKey(state.SimplifiedBoard))
+                if (!Q.ContainsKey(state))
                 {
                     boardCreation = true;
-                    Q.Add(state.SimplifiedBoard, new double[Settings.UsedBrushes.Length - 1]);
+                    Q.Add(state, new float[BrushesCount - 1]);
                 }
-                var stateQ = Q[state.SimplifiedBoard];
+                var stateQ = Q[state];
 
                 byte? action = null;
                 double actionValue = double.MinValue;
@@ -165,11 +174,11 @@ namespace FloodIt.AI
                 var r = GetRewardForAction(state, actionBrush, out GameState newgs);
                 CurrentRewards.Add(r);
 
-                double max = 0;
-                if (Q.ContainsKey(newgs.SimplifiedBoard))
+                float max = 0;
+                if (Q.ContainsKey(newgs))
                 {
-                    max = double.MinValue;
-                    foreach (var val in Q[newgs.SimplifiedBoard])
+                    max = float.MinValue;
+                    foreach (var val in Q[newgs])
                         if (max <= val)
                             max = val;
                 }
@@ -180,22 +189,27 @@ namespace FloodIt.AI
                 return actionBrush;
             }
 
-            static double GetRewardForAction(GameState oldState, Brush action, out GameState newState)
+            static float GetRewardForAction(GameState oldState, Brush action, out GameState newState)
             {
                 newState = oldState.PlayBrush(action, usingDistance: false);
 
                 int uzl = newState.ULZCount - oldState.ULZCount;
-                int blobs = oldState.BlobCount - newState.BlobCount;
-                int colors = oldState.PlayableBrushCount - newState.PlayableBrushCount;
+                int blobs = -(newState.BlobCount - oldState.BlobCount);
+                int colors = -(newState.PlayableBrushCount - oldState.PlayableBrushCount);
                 int end = Convert.ToInt32(newState.IsFinished);
 
-                double b = -1;
-                double uzlFact = 1;
-                double blobsFact = 1;
-                double colorsFact = 2;
-                double endFact = 3;
+                float b = -1;
+                float uzlFact = 1;
+                float blobsFact = 1;
+                float colorsFact = 2;
+                float endFact = 3;
 
-                double r = (uzl * uzlFact) + (blobs * blobsFact) + (colors * colorsFact) + (end * endFact) + b;
+                float r = uzl * uzlFact + blobs * blobsFact + colors * colorsFact + end * endFact + b;
+                if (r != -1 && oldState == newState)
+                {
+
+                }
+
                 return r;
             }
         }
@@ -205,8 +219,8 @@ namespace FloodIt.AI
             readonly WeakReference<QLearning> _parent;
 
             QLearning Parent => _parent.TryGetTarget(out var parent) ? parent : throw new NullReferenceException($"{nameof(Parent)} has been collected by GC");
-            public Dictionary<byte[], double[]> Q => Parent.Q;
-            
+            public Dictionary<byte[], float[]> Q => Parent.Q;
+
             public Player(QLearning parent)
             {
                 _parent = new(parent);
@@ -217,13 +231,13 @@ namespace FloodIt.AI
                 cancellationToken.ThrowIfCancellationRequested();
 
                 await Task.Delay(250, cancellationToken);
-                
-                if (!Q.ContainsKey(state.SimplifiedBoard))
+
+                if (!Q.ContainsKey(state))
                     return state.PlayableBrushes.Random();
 
                 byte? play = null;
-                double maxValue = double.MinValue;
-                var options = Q[state.SimplifiedBoard];
+                float maxValue = float.MinValue;
+                var options = Q[state];
                 for (int i = 0; i < options.Length; i++)
                 {
                     if (maxValue < options[i])

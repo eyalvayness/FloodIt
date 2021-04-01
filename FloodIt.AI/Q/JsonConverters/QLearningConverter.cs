@@ -6,8 +6,9 @@ using System.Threading.Tasks;
 using System.Text.Json.Serialization;
 using System.Text.Json;
 using System.Windows.Media;
+using FloodIt.AI.Q;
 
-namespace FloodIt.AI.JsonConverters
+namespace FloodIt.AI.Q.JsonConverters
 {
     public class QLearningConverter : JsonConverter<QLearning>
     {
@@ -16,9 +17,9 @@ namespace FloodIt.AI.JsonConverters
             if (options.GetConverter(typeof(Core.GameSettings)) is not JsonConverter<Core.GameSettings> settingsConverter)
                 throw new JsonException($"Impossible to find a converter for {nameof(Core.GameSettings)}");
 
-            double? alpha = null, gamma = null;
+            float? alpha = null, gamma = null;
             Core.GameSettings? settings = null;
-            Dictionary<byte[], double[]>? q = null;
+            Dictionary<byte[], float[]>? q = null;
 
             while (reader.Read())
             {
@@ -28,9 +29,9 @@ namespace FloodIt.AI.JsonConverters
 
                     reader.Read();
                     if (name == nameof(QLearning.Alpha))
-                        alpha = reader.GetDouble();
+                        alpha = reader.GetSingle();
                     else if (name == nameof(QLearning.Gamma))
-                        gamma = reader.GetDouble();
+                        gamma = reader.GetSingle();
                     else if (name == nameof(QLearning.Settings))
                         settings = settingsConverter.Read(ref reader, typeof(Core.GameSettings), options);
                     else if (name == nameof(QLearning.Q))
@@ -43,21 +44,17 @@ namespace FloodIt.AI.JsonConverters
                             {
                                 var s = reader.GetString() ?? throw new NullReferenceException();
                                 var board = Convert.FromBase64String(s) ?? throw new NullReferenceException();
+                                _ = settings ?? throw new NullReferenceException();
 
-                                //if (settings != null)
-                                //{
-                                //    while (board.Length != settings.UsedBrushes.Length - 1)
-                                //    {
-                                //        board = board.Prepend((byte)0).ToArray();
-                                //    }
-                                //}
+                                int n = settings.Count - board.Length;
+                                board = Enumerable.Repeat((byte)0, n).Concat(board).ToArray();
 
-                                var list = new List<double>();
+                                var list = new List<float>();
                                 while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                                 {
                                     if (reader.TokenType == JsonTokenType.Number)
                                     {
-                                        var d = reader.GetDouble();
+                                        var d = reader.GetSingle();
 
                                         list.Add(d);
                                     }
@@ -94,7 +91,8 @@ namespace FloodIt.AI.JsonConverters
             foreach (var kvp in value.Q)
             {
                 writer.WriteStartObject();
-                writer.WriteStartArray(Convert.ToBase64String(kvp.Key));
+                var trimmedBoard = kvp.Key.SkipWhile(b => b == 0).ToArray();
+                writer.WriteStartArray(Convert.ToBase64String(trimmedBoard));
                 foreach (var bytes in kvp.Value)
                 {
                     writer.WriteNumberValue(bytes);

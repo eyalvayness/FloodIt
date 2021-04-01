@@ -11,7 +11,7 @@ using System.Windows.Shapes;
 using FloodIt.Models;
 using FloodIt.Utils;
 using FloodIt.Core;
-using FloodIt.AI;
+using FloodIt.AI.Q;
 
 namespace FloodIt.ViewModels
 {
@@ -70,7 +70,7 @@ namespace FloodIt.ViewModels
             for (int i = 0; i < settings.Count; i++)
                 _container.Children.Add(rectCreation.GetNewRectangle());
 
-            _ai = new QLearning(0.5, 0.99, settings);
+            _ai = new QLearning(0.5f, 0.99f, settings);
             _game = new Game(GetBrush, SetBrush, settings);
             Moves = 0;
             _game.OnBrushPlayed += (e, b) => Moves++;

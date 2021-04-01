@@ -68,7 +68,7 @@ namespace FloodIt.Core
             if (_settings.PreventSameBrush)
                 temp.Remove(this[0, 0]);
             _playableBrushes = temp.ToArray();
-            _playableBytes = _playableBrushes.Select(b => (byte)_conversionTable.IndexOf(b)).ToArray();
+            _playableBytes = _playableBrushes.Select(b => (byte)_conversionTable.IndexOf(b)).OrderBy(b => b).ToArray();
         }
 
         void CreateSimplifiedBoard()
@@ -271,7 +271,7 @@ namespace FloodIt.Core
                 return false;
             if (other.Length != _settings.Count)
                 return false;
-            for (int index = _settings.Size; index >= 0; index--)
+            for (int index = _settings.Count - 1; index > 0; index--)
                 if (_simplifiedBoard[index] != other[index])
                     return false;
             return true;
@@ -282,7 +282,7 @@ namespace FloodIt.Core
                 return false;
             if (_settings.Size != state._settings.Size)
                 return false;
-            for (int index = _settings.Size; index >= 0; index--)
+            for (int index = _settings.Count - 1; index > 0; index--)
                 if (_simplifiedBoard[index] != state._simplifiedBoard[index])
                     return false;
             return true;
@@ -290,7 +290,6 @@ namespace FloodIt.Core
         public override bool Equals(object? obj) => Equals(obj as GameState);
         public override int GetHashCode()
         {
-            //var hc = HashCode.Combine(_simplifiedBoard);
             var hc = _simplifiedBoard.Sum(b => b);
             return hc;
         }
@@ -299,17 +298,16 @@ namespace FloodIt.Core
 
         public static bool operator !=(GameState s1, GameState s2) => !(s1 == s2);
         public static bool operator ==(GameState s1, GameState s2) => s1 is not null && s1.Equals(s2);
+        public static implicit operator byte[](GameState s) => s.SimplifiedBoard;
     }
 
     public class SimplifiedBoardEqualityComparer : IEqualityComparer<byte[]>
     {
         public bool Equals(byte[]? x, byte[]? y)
         {
-            if (x == null || y == null)
+            if (x == null || y == null || x.Length != y.Length)
                 return false;
-            if (x.Length != y.Length)
-                return false;
-            for (int index = x.Length - 1; index >= 0; index--)
+            for (int index = x.Length - 1; index > 0; index--)
                 if (x[index] != y[index])
                     return false;
 
