@@ -11,7 +11,7 @@ namespace FloodIt.AI.NN
     {
         public int InputSize => _layersInfo[0];
         public int OutputSize => _layersInfo[^1];
-        public double Fitness { get; private set; }
+        public float Fitness { get; private set; }
 
         readonly int[] _layersInfo;
 
@@ -20,9 +20,9 @@ namespace FloodIt.AI.NN
         internal NeuralNetwork(int[] layers, Activation[] activations)
         {
             if (layers.Length < 2)
-                throw new ArgumentException($"The Neural Network must have at least 2 different layers.", nameof(layers));
+                throw new ArgumentException($"The Neural Network must have at least 2 different layers (input and output).", nameof(layers));
             if (activations.Length != layers.Length - 1)
-                throw new ArgumentException($"Not the good amount of activation functions.", nameof(activations));
+                throw new ArgumentException($"Not the good amount of activation functions (received: {activations.Length}, expecting: {layers.Length - 1}).", nameof(activations));
 
             _layersInfo = layers.ToArray();
             Layers = new Layer[layers.Length - 1];
@@ -59,6 +59,8 @@ namespace FloodIt.AI.NN
 
             return arr;
         }
+
+        internal void AddFitness(float f) => Fitness += f;
 
         public int CompareTo(NeuralNetwork? other)
         {
@@ -106,6 +108,7 @@ namespace FloodIt.AI.NN
 
             static float GetRandom() => GetRandom(-.5f, .5f);
             static float GetRandom(float min, float max) => (float)(_rand.NextDouble() * (max - min) + min);
+            static float GetNormalDistribution() => .4f - 1 / MathF.Sqrt(2 * MathF.PI) * MathF.Pow(MathF.E, -(1 / 2) * MathF.Pow(GetRandom(), 2));
 
             void InitValues()
             {
@@ -141,6 +144,22 @@ namespace FloodIt.AI.NN
                 }
                 ys = _activation.Activate(ys);
                 return ys;
+            }
+
+            public void Evolution()
+            {
+                for (int i = 0; i < _weights.GetLength(0); i++)
+                {
+                    for (int j = 0; j < _weights.GetLength(1); j++)
+                    {
+                        _weights[i, j] += GetNormalDistribution();
+                    }
+                }
+
+                for (int k = 0; k < _biaises.Length; k++)
+                {
+                    _biaises[k] += GetNormalDistribution();
+                }
             }
         }
     }

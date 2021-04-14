@@ -12,19 +12,20 @@ namespace FloodIt.AI
         public static void Main(string[] args)
         {
             //int[] layers = new int[] { 2, 3, 4 };
-            var builder = MakeNN(new NNBuilder());
-            var nn = builder.Build();
+            var builder = ConfigureNeuralNetwork(new NNBuilder());
+            //var nn = builder.Build();
 
-            float[] input = new float[] { 3, 4 };
+            //float[] input = new float[] { 3, 4 };
 
 
-            var output = nn.FeedForward(input);
+            //float[] output = nn.FeedForward(input);
+
+            var manager = new NeuroEvolutionManager(builder, 5);
         }
 
-        static INNBuilder MakeNN(INNBuilderInput builderInput)
+        static INNBuilder ConfigureNeuralNetwork(INNBuilderInput builderInput)
         {
             return builderInput.Input(2)
-                               .Dense(2, Activations.Tanh)
                                .Dense(3, Activations.Tanh)
                                .Dense(4, Activations.Tanh);
             //return builder;
