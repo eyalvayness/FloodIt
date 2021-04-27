@@ -6,9 +6,8 @@ using System.Threading.Tasks;
 
 namespace FloodIt.AI.NN
 {
-    public class Activation
+    internal class Activation
     {
-        //TODO: Add Softmax activation function
         public static Activation Identity => (Activation)((float f) => f);
         public static Activation Tanh => (Activation)MathF.Tanh;
         public static Activation ReLU => (Activation)((float f) => f < 0 ? 0 : f);

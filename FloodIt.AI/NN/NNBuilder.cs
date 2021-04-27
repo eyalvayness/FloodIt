@@ -12,7 +12,7 @@ namespace FloodIt.AI.NN
     }
     public interface INNBuilder
     {
-        INNBuilder Dense(int layerSize, Activation activation);
+        INNBuilder Dense(int layerSize, Activations activation);
 
         NeuralNetwork Build();
     }
@@ -26,8 +26,7 @@ namespace FloodIt.AI.NN
         Activation[]? _activationsArray;
 
         public int[] LayersInfo => _layersArray ?? _layers.ToArray();
-        public Activation[] ActivationsInfo => _activationsArray ?? _activations.ToArray();
-
+        
         public NNBuilder()
         {
             _layers = new();
@@ -42,7 +41,7 @@ namespace FloodIt.AI.NN
             return this;
         }
 
-        public INNBuilder Dense(int layerSize, Activation activation)
+        public INNBuilder Dense(int layerSize, Activations activation)
         {
             if (_layers.Count < 1)
                 throw new InvalidOperationException("No input layer has been set yet.");

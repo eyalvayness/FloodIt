@@ -48,6 +48,30 @@ namespace FloodIt.AI.NN
         //Pre compile nn for predictions
         void Compile() { }
 
+
+        NeuralNetwork CreateChild()
+        {
+            NeuralNetwork nn = new(this.Layers);
+            foreach (var l in nn.Layers)
+            {
+                l.Evolution();
+            }
+            return nn;
+        }
+
+        public NeuralNetwork[] CreateChildren(int childrenCount)
+        {
+            List<NeuralNetwork> res = new();
+
+            for (int i = 0; i < childrenCount; i++)
+            {
+                var child = CreateChild();
+                res.Add(child);
+            }
+
+            return res.ToArray();
+        }
+
         internal float[] FeedForward(float[] input)
         {
             var arr = input;
@@ -146,7 +170,7 @@ namespace FloodIt.AI.NN
                 return ys;
             }
 
-            public void Evolution()
+            internal void Evolution()
             {
                 for (int i = 0; i < _weights.GetLength(0); i++)
                 {
