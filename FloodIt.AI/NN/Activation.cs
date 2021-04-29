@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace FloodIt.AI.NN
 {
-    internal class Activation
+    class Activation
     {
         public static Activation Identity => (Activation)((float f) => f);
         public static Activation Tanh => (Activation)MathF.Tanh;

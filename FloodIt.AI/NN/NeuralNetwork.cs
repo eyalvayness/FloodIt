@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FloodIt.Core;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -72,6 +73,28 @@ namespace FloodIt.AI.NN
             return res.ToArray();
         }
 
+        static float ComputeFitness(GameState oldState, GameState newState)
+        {
+            int uzl = newState.ULZCount - oldState.ULZCount;
+            int blobs = -(newState.BlobCount - oldState.BlobCount);
+            int colors = -(newState.PlayableBrushCount - oldState.PlayableBrushCount);
+            int end = Convert.ToInt32(newState.IsFinished);
+
+            float b = -1;
+            float uzlFact = 1;
+            float blobsFact = 1;
+            float colorsFact = 2;
+            float endFact = 3;
+
+            float r = uzl * uzlFact + blobs * blobsFact + colors * colorsFact + end * endFact + b;
+            if (r != -1 && oldState == newState)
+            {
+
+            }
+
+            return r;
+        }
+
         internal float[] FeedForward(float[] input)
         {
             var arr = input;
@@ -83,8 +106,6 @@ namespace FloodIt.AI.NN
 
             return arr;
         }
-
-        internal void AddFitness(float f) => Fitness += f;
 
         public int CompareTo(NeuralNetwork? other)
         {
