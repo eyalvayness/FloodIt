@@ -15,7 +15,7 @@ namespace FloodIt.AI.Q.JsonConverters
         public override QLearning? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (options.GetConverter(typeof(Core.GameSettings)) is not JsonConverter<Core.GameSettings> settingsConverter)
-                throw new JsonException($"Impossible to find a converter for {nameof(Core.GameSettings)}");
+                throw new JsonException($"Impossible to find a converter for the type {nameof(Core.GameSettings)}");
 
             float? alpha = null, gamma = null;
             Core.GameSettings? settings = null;
@@ -78,7 +78,7 @@ namespace FloodIt.AI.Q.JsonConverters
             writer.WriteStartObject();
 
             if (options.GetConverter(typeof(Core.GameSettings)) is not JsonConverter<Core.GameSettings> settingsConverter)
-                throw new JsonException($"Impossible to find a converter for {nameof(Core.GameSettings)}");
+                throw new JsonException($"Impossible to find a converter for the type {nameof(Core.GameSettings)}");
 
             writer.WriteNumber(nameof(QLearning.Alpha), value.Alpha);
             writer.WriteNumber(nameof(QLearning.Gamma), value.Gamma);

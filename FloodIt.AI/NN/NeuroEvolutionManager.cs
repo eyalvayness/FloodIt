@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FloodIt.Core;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,18 +16,21 @@ namespace FloodIt.AI.NN
 
         public NeuralNetwork this[int index] => _networkPool[index];
         public NeuralNetwork BestNetwork => _networkPool[0];
+        public GameSettings Settings { get; }
 
-
-        public NeuroEvolutionManager(INNBuilder builderTempate, int poolSize)
+        public NeuroEvolutionManager(INNBuilder builderTempate, int poolSize, GameSettings? settings = null)
         {
+            Settings = settings ?? new();
             PoolSize = poolSize;
 
             _networkPool = NeuroEvolutionPool.CreateNewPool(builderTempate, poolSize);
         }
 
-        void Epoch()
+        async Task Epoch()
         {
+            var runTasks = _networkPool.Select(nn => Task.Run(() => nn.Play(Settings)));
 
+            await Task.WhenAll(runTasks);
             _networkPool.ReproduceFromBest();
         }
     }

@@ -1,10 +1,14 @@
 ﻿using FloodIt.Core;
+using FloodIt.Core.Interfaces;
+using FloodIt.Core.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Media;
 
 namespace FloodIt.AI.NN
 {
@@ -17,8 +21,18 @@ namespace FloodIt.AI.NN
         readonly int[] _layersInfo;
 
         public Layer[] Layers { get; }
+        Trainer NNTrainer { get; }
+        Player NNPlayer { get; }
 
-        internal NeuralNetwork(int[] layers, Activation[] activations)
+        private NeuralNetwork()
+        {
+            NNTrainer = new(this);
+            NNPlayer = new(this);
+            _layersInfo = Array.Empty<int>();
+            Layers = Array.Empty<Layer>();
+        }
+
+        internal NeuralNetwork(int[] layers, Activation[] activations) : this()
         {
             if (layers.Length < 2)
                 throw new ArgumentException($"The Neural Network must have at least 2 different layers (input and output).", nameof(layers));
@@ -31,7 +45,7 @@ namespace FloodIt.AI.NN
             InitLayers(activations);
         }
 
-        [JsonConstructor] internal NeuralNetwork(Layer[] layers)
+        [JsonConstructor] internal NeuralNetwork(Layer[] layers) : this()
         {
             if (layers.Length < 1)
                 throw new ArgumentException($"The Neural Network must have at least 2 different layers.", nameof(layers));
@@ -69,30 +83,7 @@ namespace FloodIt.AI.NN
                 var child = CreateChild();
                 res.Add(child);
             }
-
             return res.ToArray();
-        }
-
-        static float ComputeFitness(GameState oldState, GameState newState)
-        {
-            int uzl = newState.ULZCount - oldState.ULZCount;
-            int blobs = -(newState.BlobCount - oldState.BlobCount);
-            int colors = -(newState.PlayableBrushCount - oldState.PlayableBrushCount);
-            int end = Convert.ToInt32(newState.IsFinished);
-
-            float b = -1;
-            float uzlFact = 1;
-            float blobsFact = 1;
-            float colorsFact = 2;
-            float endFact = 3;
-
-            float r = uzl * uzlFact + blobs * blobsFact + colors * colorsFact + end * endFact + b;
-            if (r != -1 && oldState == newState)
-            {
-
-            }
-
-            return r;
         }
 
         internal float[] FeedForward(float[] input)
@@ -107,6 +98,44 @@ namespace FloodIt.AI.NN
             return arr;
         }
 
+        public float Play(GameSettings? settings = null)
+        {
+            settings ??= new();
+
+            if (settings.Count != InputSize)
+                throw new InvalidOperationException($"The board size ({settings.Count}) doesn't match neural network input size ({InputSize}).");
+            if (settings.UsedBrushes.Length != OutputSize + 1)
+                throw new InvalidOperationException($"The neural network output size ({OutputSize}) must be one less than the total number of brushes ({settings.UsedBrushes.Length}).");
+
+            Fitness = 0;
+            Brush[] board = new Brush[settings.Count];
+            Brush getter(int i) => board[i];
+            void setter(int i, Brush b) => board[i] = b;
+            Game g = new(getter, setter, settings);
+
+
+            g.StartGame(NNTrainer);
+            return Fitness;
+        }
+
+        public Task<bool> PlayAsync(GameSettings? settings = null, CancellationToken cancellationToken = default)
+        {
+            settings ??= new();
+
+            if (settings.Count != InputSize)
+                throw new InvalidOperationException($"The board size ({settings.Count}) doesn't match neural network input size ({InputSize}).");
+            if (settings.UsedBrushes.Length != OutputSize + 1)
+                throw new InvalidOperationException($"The neural network output size ({OutputSize}) must be one less than the total number of brushes ({settings.UsedBrushes.Length}).");
+
+            Brush[] board = new Brush[settings.Count];
+            Brush getter(int i) => board[i];
+            void setter(int i, Brush b) => board[i] = b;
+            Game g = new(getter, setter, settings);
+
+
+            return g.StartGameAsync(NNPlayer, colorAsync: true, cancellationToken: cancellationToken);
+        }
+
         public int CompareTo(NeuralNetwork? other)
         {
             if (other == null || other.Fitness < Fitness)
@@ -115,6 +144,96 @@ namespace FloodIt.AI.NN
                 return -1;
 
             return 0;
+        }
+
+        private class Trainer : IStrategy
+        {
+            readonly WeakReference<NeuralNetwork> _parent;
+            NeuralNetwork Parent => _parent.TryGetTarget(out var parent) ? parent : throw new NullReferenceException($"{nameof(Parent)} has been collected by GC");
+
+            public Trainer(NeuralNetwork parent)
+            {
+                _parent = new(parent);
+            }
+
+            public void Train(Game g)
+            {
+                g.StartGame(this);
+            }
+
+            Brush IStrategy.Play(GameState state)
+            {
+                float[] xs = state.SimplifiedBoard.Select(b => (float)b).ToArray();
+
+                var ys = Parent.FeedForward(xs);
+                var maxV = ys.Max();
+                var index = (byte)ys.ToList().IndexOf(maxV);
+
+                Brush? b = null;
+                if (state.PlayableBytes.Contains(index))
+                    b = state.GetBrushFromByte(index);
+                else
+                    b = state.PlayableBrushes.Random();
+
+
+                float f = ComputeFitness(state, b);
+                Parent.Fitness += f;
+
+                return b;
+            }
+
+            static float ComputeFitness(GameState oldState, Brush playedBrush)
+            {
+                GameState newState = oldState.PlayBrush(playedBrush);
+
+                int uzl = newState.ULZCount - oldState.ULZCount;
+                int blobs = -(newState.BlobCount - oldState.BlobCount);
+                int colors = -(newState.PlayableBrushCount - oldState.PlayableBrushCount);
+                int end = Convert.ToInt32(newState.IsFinished);
+
+                float b = -1;// Can be changed to 0
+                float uzlFact = 1;
+                float blobsFact = 1;
+                float colorsFact = 2;
+                float endFact = 3;
+
+                float r = uzl * uzlFact + blobs * blobsFact + colors * colorsFact + end * endFact + b;
+                if (r != -1 && oldState == newState)
+                {
+
+                }
+
+                return r;
+            }
+        }
+
+        private class Player : IAsyncStrategy
+        {
+            readonly WeakReference<NeuralNetwork> _parent;
+            NeuralNetwork Parent => _parent.TryGetTarget(out var parent) ? parent : throw new NullReferenceException($"{nameof(Parent)} has been collected by GC");
+
+            public Player(NeuralNetwork parent)
+            {
+                _parent = new(parent);
+            }
+
+            Task<Brush> IAsyncStrategy.PlayAsync(GameState state, CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                float[] xs = state.SimplifiedBoard.Select(b => (float)b).ToArray();
+
+                var ys = Parent.FeedForward(xs);
+                var maxV = ys.Max();
+                var index = (byte)ys.ToList().IndexOf(maxV);
+
+                Brush? b = null;
+                if (state.PlayableBytes.Contains(index))
+                    b = state.GetBrushFromByte(index);
+                else
+                    b = state.PlayableBrushes.Random();
+
+                return Task.FromResult(b);
+            }
         }
 
         public class Layer

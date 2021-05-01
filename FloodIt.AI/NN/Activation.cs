@@ -8,35 +8,34 @@ namespace FloodIt.AI.NN
 {
     class Activation
     {
-        public static Activation Identity => (Activation)((float f) => f);
-        public static Activation Tanh => (Activation)MathF.Tanh;
-        public static Activation ReLU => (Activation)((float f) => f < 0 ? 0 : f);
-        public static Activation Sigmoid => (Activation)((float f) => 1 / (1 + MathF.Exp(-f)));
-        public static Activation BinaryStep => (Activation)((float f) => f < 0 ? 0 : 1);
-        public static Activation LeakyReLU => (Activation)((float f) => f < 0 ? 0.01f * f : f);
-        public static Activation Softmax => (Activation)((float[] fs) =>
+        public static Activation Identity => new((float f) => f, Activations.Identity);
+        public static Activation Tanh => new(MathF.Tanh, Activations.Tanh);
+        public static Activation ReLU => new((float f) => f < 0 ? 0 : f, Activations.ReLU);
+        public static Activation Sigmoid => new((float f) => 1 / (1 + MathF.Exp(-f)), Activations.Sigmoid);
+        public static Activation BinaryStep => new((float f) => f < 0 ? 0 : 1, Activations.BinaryStep);
+        public static Activation LeakyReLU => new((float f) => f < 0 ? 0.01f * f : f, Activations.LeakyReLU);
+        public static Activation Softmax => new((float[] fs) =>
         {
             var ffs = fs.Select(MathF.Exp);
             var sum = ffs.Sum();
             return ffs.Select(f => f / sum).ToArray();
-        });
+        }, Activations.Softmax);
 
 
         readonly Func<float[], float[]> _activation;
+        readonly Activations _enumVal;
 
-        public Activation(Func<float[], float[]> activation)
+        private Activation(Func<float[], float[]> activation, Activations enumVal)
         {
             _activation = activation;
         }
-        public Activation(Func<float, float> singleActivation)
-        {
-            _activation = (float[] fs) => fs.Select(singleActivation).ToArray();
-        }
+        private Activation(Func<float, float> singleActivation, Activations enumVal) : this((float[] fs) => fs.Select(singleActivation).ToArray(), enumVal)
+        { }
 
         public float[] Activate(float[] fs) => _activation(fs);
 
-        public static implicit operator Activation(Func<float[], float[]> af) => new(af);
-        public static implicit operator Activation(Func<float, float> af) => new(af);
+        //public static implicit operator Activation(Func<float[], float[]> af) => new(af);
+        //public static implicit operator Activation(Func<float, float> af) => new(af);
 
         public static implicit operator Activation(Activations a) => a switch
         {
@@ -49,6 +48,7 @@ namespace FloodIt.AI.NN
             Activations.Softmax => Softmax,
             _ => throw new NotImplementedException()
         };
+        public static explicit operator Activations(Activation a) => a._enumVal;
     }
 
     public enum Activations
