@@ -27,7 +27,7 @@ namespace FloodIt.AI.NN
         }
 
         async Task Epoch()
-        {
+        { 
             var runTasks = _networkPool.Select(nn => Task.Run(() => nn.Play(Settings)));
 
             await Task.WhenAll(runTasks);
