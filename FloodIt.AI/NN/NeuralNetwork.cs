@@ -98,7 +98,7 @@ namespace FloodIt.AI.NN
             return arr;
         }
 
-        public float Play(GameSettings? settings = null)
+        public async Task<float> TrainAsync(GameSettings? settings = null)
         {
             settings ??= new();
 
@@ -114,7 +114,7 @@ namespace FloodIt.AI.NN
             Game g = new(getter, setter, settings);
 
 
-            g.StartGame(NNTrainer);
+            await g.StartGameAsync(NNTrainer, colorAsync: false);
             return Fitness;
         }
 
@@ -146,7 +146,7 @@ namespace FloodIt.AI.NN
             return 0;
         }
 
-        private class Trainer : IStrategy
+        private class Trainer : IStrategy, IAsyncStrategy
         {
             readonly WeakReference<NeuralNetwork> _parent;
             NeuralNetwork Parent => _parent.TryGetTarget(out var parent) ? parent : throw new NullReferenceException($"{nameof(Parent)} has been collected by GC");
@@ -167,7 +167,7 @@ namespace FloodIt.AI.NN
 
                 var ys = Parent.FeedForward(xs);
                 var maxV = ys.Max();
-                var index = (byte)ys.ToList().IndexOf(maxV);
+                var index = (byte)(ys.ToList().IndexOf(maxV) + 1);
 
                 Brush? b = null;
                 if (state.PlayableBytes.Contains(index))
@@ -180,6 +180,28 @@ namespace FloodIt.AI.NN
                 Parent.Fitness += f;
 
                 return b;
+            }
+
+            Task<Brush> IAsyncStrategy.PlayAsync(GameState state, CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                float[] xs = state.SimplifiedBoard.Select(b => (float)b).ToArray();
+
+                var ys = Parent.FeedForward(xs);
+                var maxV = ys.Max();
+                var index = (byte)(ys.ToList().IndexOf(maxV) + 1);
+
+                Brush? b = null;
+                if (state.PlayableBytes.Contains(index))
+                    b = state.GetBrushFromByte(index);
+                else
+                    b = state.PlayableBrushes.Random();
+
+
+                float f = ComputeFitness(state, b);
+                Parent.Fitness += f;
+
+                return Task.FromResult(b);
             }
 
             static float ComputeFitness(GameState oldState, Brush playedBrush)
@@ -224,7 +246,7 @@ namespace FloodIt.AI.NN
 
                 var ys = Parent.FeedForward(xs);
                 var maxV = ys.Max();
-                var index = (byte)ys.ToList().IndexOf(maxV);
+                var index = (byte)(ys.ToList().IndexOf(maxV) + 1);
 
                 Brush? b = null;
                 if (state.PlayableBytes.Contains(index))

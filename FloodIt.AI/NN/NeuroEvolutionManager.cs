@@ -26,11 +26,11 @@ namespace FloodIt.AI.NN
             _networkPool = NeuroEvolutionPool.CreateNewPool(builderTempate, poolSize);
         }
 
-        async Task Epoch()
+        public async Task Epoch()
         { 
-            var runTasks = _networkPool.Select(nn => Task.Run(() => nn.Play(Settings)));
+            var runTasks = _networkPool.Select(nn => nn.TrainAsync(Settings));
 
-            await Task.WhenAll(runTasks);
+            await Task.WhenAny(runTasks);
             _networkPool.ReproduceFromBest();
         }
     }

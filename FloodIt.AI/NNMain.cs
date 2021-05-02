@@ -9,7 +9,7 @@ namespace FloodIt.AI
 {
     public static class NNMain
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             //int[] layers = new int[] { 2, 3, 4 };
             var builder = ConfigureNeuralNetwork(new NNBuilder());
@@ -20,14 +20,17 @@ namespace FloodIt.AI
 
             //float[] output = nn.FeedForward(input);
 
-            var manager = new NeuroEvolutionManager(builder, 5);
+            var manager = new NeuroEvolutionManager(builder, 5, new() { Size = 4 });
+            await manager.Epoch();
         }
 
         static INNBuilder ConfigureNeuralNetwork(INNBuilderInput builderInput)
         {
-            return builderInput.Input(2)
-                               .Dense(3, Activations.Tanh)
-                               .Dense(4, Activations.Tanh);
+            return builderInput.Input(16)
+                               .Dense(10, Activations.Tanh)
+                               //.Dense(30, Activations.Tanh)
+                               //.Dense(15, Activations.Tanh)
+                               .Dense(7, Activations.Softmax);
             //return builder;
         }
     }
