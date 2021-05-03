@@ -98,7 +98,7 @@ namespace FloodIt.AI.NN
             return arr;
         }
 
-        public async Task<float> TrainAsync(GameSettings? settings = null)
+        public async Task<float> TrainAsync(int maxIteration = 1_000, GameSettings? settings = null)
         {
             settings ??= new();
 
@@ -113,12 +113,12 @@ namespace FloodIt.AI.NN
             void setter(int i, Brush b) => board[i] = b;
             Game g = new(getter, setter, settings);
 
-
-            await g.StartGameAsync(NNTrainer, colorAsync: false);
+            await NNTrainer.TrainAsync(g, maxIteration: maxIteration);
+            //await g.StartGameAsync(NNTrainer, colorAsync: false);
             return Fitness;
         }
 
-        public Task<bool> PlayAsync(GameSettings? settings = null, CancellationToken cancellationToken = default)
+        public Task<bool> PlayAsync(int maxIteration = 1_000, GameSettings? settings = null, CancellationToken cancellationToken = default)
         {
             settings ??= new();
 
@@ -132,8 +132,8 @@ namespace FloodIt.AI.NN
             void setter(int i, Brush b) => board[i] = b;
             Game g = new(getter, setter, settings);
 
-
-            return g.StartGameAsync(NNPlayer, colorAsync: true, cancellationToken: cancellationToken);
+            return NNPlayer.GameAsync(g);
+            //return g.StartGameAsync(NNPlayer, colorAsync: true, cancellationToken: cancellationToken);
         }
 
         public int CompareTo(NeuralNetwork? other)
@@ -151,18 +151,33 @@ namespace FloodIt.AI.NN
             readonly WeakReference<NeuralNetwork> _parent;
             NeuralNetwork Parent => _parent.TryGetTarget(out var parent) ? parent : throw new NullReferenceException($"{nameof(Parent)} has been collected by GC");
 
+            int _currentCount = 0;
+            int _currentMaxIteration = 1_000;
+
             public Trainer(NeuralNetwork parent)
             {
                 _parent = new(parent);
             }
 
-            public void Train(Game g)
+            public void Train(Game g, int maxIteration = 1_000)
             {
+                _currentCount = 0;
+                _currentMaxIteration = maxIteration;
                 g.StartGame(this);
             }
 
-            Brush IStrategy.Play(GameState state)
+            public async Task TrainAsync(Game g, int maxIteration = 1_000)
             {
+                _currentCount = 0;
+                _currentMaxIteration = maxIteration;
+                await g.StartGameAsync(this, colorAsync: false, cancellationToken: default);
+            }
+            Brush? IStrategy.Play(GameState state)
+            {
+                if (++_currentCount >= _currentMaxIteration)
+                {
+                    return null;
+                }
                 float[] xs = state.SimplifiedBoard.Select(b => (float)b).ToArray();
 
                 var ys = Parent.FeedForward(xs);
@@ -182,9 +197,13 @@ namespace FloodIt.AI.NN
                 return b;
             }
 
-            Task<Brush> IAsyncStrategy.PlayAsync(GameState state, CancellationToken cancellationToken)
+            Task<Brush?> IAsyncStrategy.PlayAsync(GameState state, CancellationToken cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (++_currentCount >= _currentMaxIteration)
+                {
+                    return Task.FromResult<Brush?>(null);
+                }
                 float[] xs = state.SimplifiedBoard.Select(b => (float)b).ToArray();
 
                 var ys = Parent.FeedForward(xs);
@@ -201,7 +220,7 @@ namespace FloodIt.AI.NN
                 float f = ComputeFitness(state, b);
                 Parent.Fitness += f;
 
-                return Task.FromResult(b);
+                return Task.FromResult<Brush?>(b);
             }
 
             static float ComputeFitness(GameState oldState, Brush playedBrush)
@@ -239,7 +258,12 @@ namespace FloodIt.AI.NN
                 _parent = new(parent);
             }
 
-            Task<Brush> IAsyncStrategy.PlayAsync(GameState state, CancellationToken cancellationToken)
+            public async Task<bool> GameAsync(Game g)
+            {
+                return await g.StartGameAsync(this);
+            }
+
+            Task<Brush?> IAsyncStrategy.PlayAsync(GameState state, CancellationToken cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 float[] xs = state.SimplifiedBoard.Select(b => (float)b).ToArray();
@@ -254,7 +278,7 @@ namespace FloodIt.AI.NN
                 else
                     b = state.PlayableBrushes.Random();
 
-                return Task.FromResult(b);
+                return Task.FromResult<Brush?>(b);
             }
         }
 

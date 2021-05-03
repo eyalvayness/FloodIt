@@ -25,13 +25,24 @@ namespace FloodIt.AI.NN
 
             _networkPool = NeuroEvolutionPool.CreateNewPool(builderTempate, poolSize);
         }
+        
+        public async Task Epochs(int n = 10)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                var stats = await Epoch();
+                System.Diagnostics.Debug.WriteLine($"--------- Epoch #{i + 1} ---------");
+                stats.Debug();
+            }
+        }
 
-        public async Task Epoch()
+        async Task<NeuroEvolutionPool.PoolStat> Epoch()
         { 
-            var runTasks = _networkPool.Select(nn => nn.TrainAsync(Settings));
+            var runTasks = _networkPool.Select(nn => nn.TrainAsync(maxIteration: 1_000, settings: Settings));
 
             await Task.WhenAny(runTasks);
-            _networkPool.ReproduceFromBest();
+            var stats = _networkPool.ReproduceFromBest();
+            return stats;
         }
     }
 
@@ -48,15 +59,19 @@ namespace FloodIt.AI.NN
             _list = new(_poolSize);
         }
 
-        public void ReproduceFromBest()
+        public PoolStat ReproduceFromBest()
         {
             //var tmp = _list[0];
-            var best = _list.OrderByDescending(nn => nn.Fitness).First();
+            var order = _list.OrderByDescending(nn => nn.Fitness).ToList();
+            var best = _list.First();
+
+            var fitnesses = order.Select(nn => nn.Fitness).ToList();
             _list.Clear();
             _list.Add(best);
 
             var children = best.CreateChildren(_poolSize - 1);
             _list.AddRange(children);
+            return new(fitnesses[0], fitnesses[^1], order.Average(nn => nn.Fitness), (fitnesses[(fitnesses.Count - 1) / 2] + fitnesses[fitnesses.Count / 2]) / 2f);
         }
 
         public static NeuroEvolutionPool CreateNewPool(INNBuilder builderTemplate, int poolSize)
@@ -66,6 +81,17 @@ namespace FloodIt.AI.NN
             for (int i = 0; i < poolSize; i++)
                 nnp._list.Add(builderTemplate.Build());
             return nnp;
+        }
+
+        public record PoolStat(float BestFitness, float WorstFitness, float AverageFitness, float MeanFitness)
+        {
+            public void Debug()
+            {
+                System.Diagnostics.Debug.WriteLine($"Best fitness:\t\t{BestFitness}");
+                System.Diagnostics.Debug.WriteLine($"Worst fitness:\t\t{WorstFitness}");
+                System.Diagnostics.Debug.WriteLine($"Average fitness:\t{AverageFitness}");
+                System.Diagnostics.Debug.WriteLine($"Mean fitness:\t\t{MeanFitness}");
+            }
         }
 
         public IEnumerator<NeuralNetwork> GetEnumerator() => _list.GetEnumerator();

@@ -10,11 +10,11 @@ namespace FloodIt.Core.Interfaces
 {
     public interface IStrategy
     {
-        Brush Play(GameState state);
+        Brush? Play(GameState state);
     }
 
     public interface IAsyncStrategy
     {
-        Task<Brush> PlayAsync(GameState state, CancellationToken cancellationToken);
+        Task<Brush?> PlayAsync(GameState state, CancellationToken cancellationToken);
     }
 }

@@ -132,7 +132,7 @@ namespace FloodIt.ViewModels
             _reader = reader;
         }
 
-        public async Task<Brush> PlayAsync(GameState state, CancellationToken cancellationToken)
+        public async Task<Brush?> PlayAsync(GameState state, CancellationToken cancellationToken)
         {
             await _reader.WaitToReadAsync(cancellationToken);
             Brush b = await _reader.ReadAsync(cancellationToken);

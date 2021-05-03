@@ -226,7 +226,7 @@ namespace FloodIt.AI.Q
                 _parent = new(parent);
             }
 
-            async Task<Brush> IAsyncStrategy.PlayAsync(GameState state, CancellationToken cancellationToken)
+            async Task<Brush?> IAsyncStrategy.PlayAsync(GameState state, CancellationToken cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 

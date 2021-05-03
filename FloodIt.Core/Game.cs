@@ -118,7 +118,12 @@ namespace FloodIt.Core
         {
             while (!IsFinished)
             {
-                Brush played = strat.Play(_currentState);
+                Brush? nullable = strat.Play(_currentState);
+                if (nullable == null)
+                {
+                    return false;
+                }
+                Brush played = nullable;
                 if (!Settings.PreventSameBrush || played != UpperLeft)
                 {
                     OnBrushPlayed?.Invoke(this, played);
@@ -135,7 +140,12 @@ namespace FloodIt.Core
             {
                 if (cancellationToken.IsCancellationRequested)
                     return false;
-                Brush played = await strat.PlayAsync(_currentState, cancellationToken);
+                Brush? nullable = await strat.PlayAsync(_currentState, cancellationToken);
+                if (nullable == null)
+                {
+                    return false;
+                }
+                Brush played = nullable;
                 if (!Settings.PreventSameBrush || played != UpperLeft)
                 {
                     OnBrushPlayed?.Invoke(this, played);

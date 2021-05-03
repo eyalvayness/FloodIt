@@ -28,6 +28,7 @@ namespace FloodIt.AI.NN
         private Activation(Func<float[], float[]> activation, Activations enumVal)
         {
             _activation = activation;
+            _enumVal = enumVal;
         }
         private Activation(Func<float, float> singleActivation, Activations enumVal) : this((float[] fs) => fs.Select(singleActivation).ToArray(), enumVal)
         { }
