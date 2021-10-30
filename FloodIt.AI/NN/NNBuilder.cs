@@ -52,8 +52,8 @@ namespace FloodIt.AI.NN
 
         public NeuralNetwork Build()
         {
-            _layersArray ??= _layers.ToArray();
-            _activationsArray ??= _activations.ToArray();
+            _layersArray = _layers.ToArray();
+            _activationsArray = _activations.ToArray();
 
             return new(_layersArray, _activationsArray);
         }

@@ -40,18 +40,19 @@ namespace FloodIt.AI.NN
         { 
             var runTasks = _networkPool.Select(nn => nn.TrainAsync(maxIteration: 1_000, settings: Settings));
 
-            await Task.WhenAny(runTasks);
+            await Task.WhenAll(runTasks);
             var stats = _networkPool.ReproduceFromBest();
             return stats;
         }
     }
 
-    internal class NeuroEvolutionPool : IEnumerable<NeuralNetwork>
+    internal class NeuroEvolutionPool : IEnumerable<NeuralNetwork>, IReadOnlyList<NeuralNetwork>
     {
         readonly int _poolSize;
         readonly List<NeuralNetwork> _list;
 
         public NeuralNetwork this[int index] => _list[index];
+        public int Count => _list.Count;
 
         NeuroEvolutionPool(int poolSize)
         {
@@ -71,7 +72,7 @@ namespace FloodIt.AI.NN
 
             var children = best.CreateChildren(_poolSize - 1);
             _list.AddRange(children);
-            return new(fitnesses[0], fitnesses[^1], order.Average(nn => nn.Fitness), (fitnesses[(fitnesses.Count - 1) / 2] + fitnesses[fitnesses.Count / 2]) / 2f);
+            return new(fitnesses);
         }
 
         public static NeuroEvolutionPool CreateNewPool(INNBuilder builderTemplate, int poolSize)
@@ -83,14 +84,34 @@ namespace FloodIt.AI.NN
             return nnp;
         }
 
-        public record PoolStat(float BestFitness, float WorstFitness, float AverageFitness, float MeanFitness)
+        public record PoolStat
         {
+            readonly float[] _fitnesses;
+
+            public float BestFitness { get; }
+            public float WorstFitness { get; }
+            public float AverageFitness { get; }
+            public float MeanFitness { get; }
+            public float PositiveFitnesses { get; }
+
+            public PoolStat(IEnumerable<float> fitnesses)
+            {
+                _fitnesses = fitnesses.ToArray();
+
+                BestFitness = _fitnesses.Max();
+                WorstFitness = _fitnesses.Min(); 
+                AverageFitness = _fitnesses.Average();
+                MeanFitness = (_fitnesses[(_fitnesses.Length - 1) / 2] + _fitnesses[_fitnesses.Length / 2]) / 2f;
+                PositiveFitnesses = _fitnesses.Count(f => f > 0);
+            }
+
             public void Debug()
             {
                 System.Diagnostics.Debug.WriteLine($"Best fitness:\t\t{BestFitness}");
                 System.Diagnostics.Debug.WriteLine($"Worst fitness:\t\t{WorstFitness}");
                 System.Diagnostics.Debug.WriteLine($"Average fitness:\t{AverageFitness}");
                 System.Diagnostics.Debug.WriteLine($"Mean fitness:\t\t{MeanFitness}");
+                System.Diagnostics.Debug.WriteLine($"Positive fitnesses:\t{PositiveFitnesses/_fitnesses.Length}");
             }
         }
 

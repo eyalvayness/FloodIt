@@ -3,6 +3,7 @@ using FloodIt.Core.Interfaces;
 using FloodIt.Core.Utils;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -134,6 +135,11 @@ namespace FloodIt.AI.NN
 
             return NNPlayer.GameAsync(g);
             //return g.StartGameAsync(NNPlayer, colorAsync: true, cancellationToken: cancellationToken);
+        }
+
+        public override string ToString()
+        {
+            return $"F: {Fitness}, L: " + string.Join(" -> ", Layers.Select(l => l.InputSize).Append(Layers[^1].OutputSize));
         }
 
         public int CompareTo(NeuralNetwork? other)

@@ -21,17 +21,15 @@ namespace FloodIt.AI
             //float[] output = nn.FeedForward(input);
 
             var manager = new NeuroEvolutionManager(builder, poolSize: 20, new() { Size = 4 });
-            await manager.Epochs(n: 50);
+            await manager.Epochs(n: 1_000);
         }
 
         static INNBuilder ConfigureNeuralNetwork(INNBuilderInput builderInput)
         {
             return builderInput.Input(16)
-                               .Dense(10, Activations.Tanh)
-                               .Dense(10, Activations.Tanh)
-                               .Dense(10, Activations.Tanh)
-                               //.Dense(30, Activations.Tanh)
-                               //.Dense(15, Activations.Tanh)
+                               .Dense(14, Activations.LeakyReLU)
+                               .Dense(12, Activations.LeakyReLU)
+                               .Dense(10, Activations.LeakyReLU)
                                .Dense(7, Activations.Softmax);
             //return builder;
         }
