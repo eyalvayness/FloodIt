@@ -13,13 +13,12 @@ namespace FloodIt.AI.NN.JsonConverters
         public const string WeightsPropertyName = "Weights";
         public const string BiaisesPropertyName = "Biaises";
 
-
         public override NeuralNetwork.Layer? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             int inputSize = -1, outputSize = -1;
             Activations? activation = null;
-            float[,] weights = null;
-            float[] biaises = null;
+            float[,]? weights = null;
+            float[]? biaises = null;
             while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
             {
                 if (reader.TokenType == JsonTokenType.PropertyName)
@@ -28,11 +27,11 @@ namespace FloodIt.AI.NN.JsonConverters
                     reader.Read();
                     if (name == nameof(NeuralNetwork.Layer.InputSize))
                         inputSize = reader.GetInt32();
-                    if (name == nameof(NeuralNetwork.Layer.OutputSize))
+                    else if (name == nameof(NeuralNetwork.Layer.OutputSize))
                         outputSize = reader.GetInt32();
-                    if (name == nameof(NeuralNetwork.Layer.Activation))
+                    else if (name == nameof(NeuralNetwork.Layer.Activation))
                         activation = Enum.Parse(typeof(Activations), reader.GetString()!) as Activations?;
-                    if (name == WeightsPropertyName)
+                    else if (name == WeightsPropertyName)
                     {
                         _ = inputSize == -1 ? throw new NullReferenceException() : true;
                         _ = outputSize == -1 ? throw new NullReferenceException() : true;
@@ -42,17 +41,23 @@ namespace FloodIt.AI.NN.JsonConverters
                         {
                             while (reader.Read() && reader.TokenType != JsonTokenType.EndArray && j < inputSize)
                             {
-                                j++;
                                 weights[i, j] = reader.GetSingle();
+                                j++;
                             }
                             j = 0;
                             i++;
                         }
                     }
-                    if (name == BiaisesPropertyName)
+                    else if (name == BiaisesPropertyName)
                     {
                         _ = outputSize == -1 ? throw new NullReferenceException() : true;
                         biaises = new float[outputSize];
+                        int i = 0;
+                        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray && i < outputSize)
+                        {
+                            biaises[i] = reader.GetSingle();
+                            i++;
+                        }
                     }
                 }
             }

@@ -14,7 +14,7 @@ using System.Windows.Media;
 
 namespace FloodIt.AI.NN
 {
-    public class NeuralNetwork : IComparable<NeuralNetwork>
+    public class NeuralNetwork : IComparable<NeuralNetwork>, IEquatable<NeuralNetwork>
     {
         public int InputSize => _layersInfo[0];
         public int OutputSize => _layersInfo[^1];
@@ -143,6 +143,20 @@ namespace FloodIt.AI.NN
             return $"F: {Fitness}, L: " + string.Join(" -> ", Layers.Select(l => l.InputSize).Append(Layers[^1].OutputSize));
         }
 
+        public override bool Equals(object? obj) => Equals(obj as NeuralNetwork);
+        public bool Equals(NeuralNetwork? other)
+        {
+            if (other == null)
+                return false;
+            if (InputSize != other.InputSize || OutputSize != other.OutputSize || Layers.Length != other.Layers.Length)
+                return false;
+            for (int i = 0; i < Layers.Length; i++)
+                if (Layers[i].Equals(other.Layers[i]) == false)
+                    return false;
+            return true;
+        }
+        public override int GetHashCode() => HashCode.Combine(InputSize, OutputSize, Layers.Length);
+
         public int CompareTo(NeuralNetwork? other)
         {
             if (other == null || other.Fitness < Fitness)
@@ -177,7 +191,6 @@ namespace FloodIt.AI.NN
             };
             opt.Converters.Add(new JsonConverters.NeuralNetworkConverter());
             opt.Converters.Add(new JsonConverters.LayerConverter());
-            opt.Converters.Add(new Core.JsonConverters.GameSettingsConverter());
             return opt;
         }
 
@@ -317,7 +330,7 @@ namespace FloodIt.AI.NN
             }
         }
 
-        public class Layer
+        public class Layer : IEquatable<Layer>
         {
             readonly static Random _rand;
 
@@ -407,6 +420,31 @@ namespace FloodIt.AI.NN
                     _biaises[k] += GetNormalDistribution();
                 }
             }
+
+            public override bool Equals(object? obj) => Equals(obj as Layer);
+            public bool Equals(Layer? other)
+            {
+                if (other == null)
+                    return false;
+                if (Activation != other.Activation || InputSize != other.InputSize || OutputSize != other.OutputSize)
+                    return false;
+
+                for (int i = 0; i < OutputSize; i++)
+                {
+                    if (_biaises[i] != other._biaises[i])
+                        return false;
+
+                    for (int j = 0; j < InputSize; j++)
+                    {
+                        if (_weights[i, j] != other._weights[i, j])
+                            return false;
+                    }
+                }
+
+                return true;
+            }
+
+            public override int GetHashCode() => HashCode.Combine(Activation, InputSize, OutputSize);
         }
     }
 }

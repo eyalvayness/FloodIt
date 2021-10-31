@@ -23,11 +23,15 @@ namespace FloodIt.AI
             //await manager.Epochs(n: 1_000);
 
             var best = manager.BestNetwork;
-            string content = best.Save("NN1", true);
+            string content = best.Save("NN1.json", true);
 
             System.Diagnostics.Debug.Write(content);
 
-            var nn = NeuralNetwork.Load("NN1");
+            var nn = NeuralNetwork.Load("NN1.json")!;
+            string content2 = nn.Save("NN2.json", true);
+
+            var b1 = content == content2;
+            var b2 = best.Equals(nn);
         }
 
         static INNBuilder ConfigureNeuralNetwork(INNBuilderInput builderInput)

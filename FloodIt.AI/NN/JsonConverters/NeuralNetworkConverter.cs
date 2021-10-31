@@ -12,10 +12,10 @@ namespace FloodIt.AI.NN.JsonConverters
     {
         public override NeuralNetwork? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (options.GetConverter(typeof(Core.GameSettings)) is not JsonConverter<Core.GameSettings> settingsConverter)
-                throw new JsonException($"Impossible to find a converter for the type {nameof(Core.GameSettings)}");
             if (options.GetConverter(typeof(NeuralNetwork.Layer)) is not JsonConverter<NeuralNetwork.Layer> layersConverter)
                 throw new JsonException($"Impossible to find a converter for the type {nameof(NeuralNetwork.Layer)}");
+
+            List<NeuralNetwork.Layer> layers = new();
 
             while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
             {
@@ -26,24 +26,23 @@ namespace FloodIt.AI.NN.JsonConverters
                     {
                         while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                         {
-                            layersConverter.Read(ref reader, typeof(NeuralNetwork.Layer), options);
+                            var layer = layersConverter.Read(ref reader, typeof(NeuralNetwork.Layer), options);
+                            _ = layer ?? throw new NullReferenceException();
+                            layers.Add(layer);
                         }
                     }
                 }
             }
 
-            return null;
+            return new(layers.ToArray());
         }
 
         public override void Write(Utf8JsonWriter writer, NeuralNetwork value, JsonSerializerOptions options)
         {
-            if (options.GetConverter(typeof(Core.GameSettings)) is not JsonConverter<Core.GameSettings> settingsConverter)
-                throw new JsonException($"Impossible to find a converter for the type {nameof(Core.GameSettings)}");
             if (options.GetConverter(typeof(NeuralNetwork.Layer)) is not JsonConverter<NeuralNetwork.Layer> layersConverter)
                 throw new JsonException($"Impossible to find a converter for the type {nameof(NeuralNetwork.Layer)}");
 
             writer.WriteStartObject();
-
             writer.WriteStartArray(nameof(NeuralNetwork.Layers));
             foreach (var layer in value.Layers)
             {
