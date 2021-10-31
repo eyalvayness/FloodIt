@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -152,6 +153,34 @@ namespace FloodIt.AI.NN
             return 0;
         }
 
+        public string Save(string filename, bool writeIndented = false)
+        {
+            var opt = GetSerializerOptions(writeIndented);
+            var json = JsonSerializer.Serialize(this, opt);
+
+            System.IO.File.WriteAllText(filename, json);
+            return json;
+        }
+        public static NeuralNetwork? Load(string filename, bool writeIndented = false)
+        {
+            var opt = GetSerializerOptions(writeIndented);
+            var json = System.IO.File.ReadAllText(filename);
+            var ai = JsonSerializer.Deserialize<NeuralNetwork>(json, opt);
+
+            return ai;
+        }
+        static JsonSerializerOptions GetSerializerOptions(bool writeIndented)
+        {
+            var opt = new JsonSerializerOptions()
+            {
+                WriteIndented = writeIndented
+            };
+            opt.Converters.Add(new JsonConverters.NeuralNetworkConverter());
+            opt.Converters.Add(new JsonConverters.LayerConverter());
+            opt.Converters.Add(new Core.JsonConverters.GameSettingsConverter());
+            return opt;
+        }
+
         private class Trainer : IStrategy, IAsyncStrategy
         {
             readonly WeakReference<NeuralNetwork> _parent;
@@ -296,6 +325,7 @@ namespace FloodIt.AI.NN
             readonly float[,] _weights;
             readonly Activation _activation;
 
+            public Activations Activation => (Activations)_activation;
             public int InputSize { get; }
             public int OutputSize { get; }
 
@@ -305,7 +335,7 @@ namespace FloodIt.AI.NN
             {
                 InputSize = inputSize;
                 OutputSize = outputSize;
-                _weights = new float[inputSize, outputSize];
+                _weights = new float[outputSize, inputSize];
                 _biaises = new float[outputSize];
                 _activation = activation;
 
@@ -324,7 +354,7 @@ namespace FloodIt.AI.NN
 
             static float GetRandom() => GetRandom(-.5f, .5f);
             static float GetRandom(float min, float max) => (float)(_rand.NextDouble() * (max - min) + min);
-            static float GetNormalDistribution() => .4f - 1 / MathF.Sqrt(2 * MathF.PI) * MathF.Pow(MathF.E, -(1 / 2) * MathF.Pow(GetRandom(), 2));
+            static float GetNormalDistribution() => .4f - 1 / MathF.Sqrt(2 * MathF.PI) * MathF.Exp(-(1 / 2) * MathF.Pow(GetRandom(), 2));
 
             void InitValues()
             {
@@ -333,13 +363,13 @@ namespace FloodIt.AI.NN
                     _biaises[i] = GetRandom();
                     for (int j = 0; j < InputSize; j++)
                     {
-                        _weights[j, i] = GetRandom();
+                        _weights[i, j] = GetRandom();
                     }
                 }
             }
 
             public float GetBiaiseAt(int index) => _biaises[index];
-            public float GetWeightAt(int inputIndex, int outputIndex) => _weights[inputIndex, outputIndex];
+            public float GetWeightAt(int outputIndex, int inputIndex) => _weights[outputIndex, inputIndex];
 
             public float[] FeedForward(float[] xs)
             {
@@ -356,7 +386,7 @@ namespace FloodIt.AI.NN
                     //    ys[i] = ys[i] + xs[j] * _weights[j, i];
                     //}
                     //var val = _biaises[i] + xs.Select((v, j) => v * _weights[j, i]).Sum();
-                    ys[i] = _biaises[i] + xs.Select((v, j) => v * _weights[j, i]).Sum();
+                    ys[i] = _biaises[i] + xs.Select((v, j) => v * _weights[i, j]).Sum();
                 }
                 ys = _activation.Activate(ys);
                 return ys;
@@ -364,15 +394,15 @@ namespace FloodIt.AI.NN
 
             internal void Evolution()
             {
-                for (int i = 0; i < _weights.GetLength(0); i++)
+                for (int i = 0; i < OutputSize; i++)
                 {
-                    for (int j = 0; j < _weights.GetLength(1); j++)
+                    for (int j = 0; j < InputSize; j++)
                     {
                         _weights[i, j] += GetNormalDistribution();
                     }
                 }
 
-                for (int k = 0; k < _biaises.Length; k++)
+                for (int k = 0; k < OutputSize; k++)
                 {
                     _biaises[k] += GetNormalDistribution();
                 }

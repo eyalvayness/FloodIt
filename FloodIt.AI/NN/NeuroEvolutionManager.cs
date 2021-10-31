@@ -31,8 +31,7 @@ namespace FloodIt.AI.NN
             for (int i = 0; i < n; i++)
             {
                 var stats = await Epoch();
-                System.Diagnostics.Debug.WriteLine($"--------- Epoch #{i + 1} ---------");
-                stats.Debug();
+                stats.Debug($"--------- Epoch #{i + 1} ---------");
             }
         }
 
@@ -105,8 +104,10 @@ namespace FloodIt.AI.NN
                 PositiveFitnesses = _fitnesses.Count(f => f > 0);
             }
 
-            public void Debug()
+            public void Debug(string? title = null)
             {
+                if (string.IsNullOrEmpty(title) == false)
+                    System.Diagnostics.Debug.WriteLine(title);
                 System.Diagnostics.Debug.WriteLine($"Best fitness:\t\t{BestFitness}");
                 System.Diagnostics.Debug.WriteLine($"Worst fitness:\t\t{WorstFitness}");
                 System.Diagnostics.Debug.WriteLine($"Average fitness:\t{AverageFitness}");

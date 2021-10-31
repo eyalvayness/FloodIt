@@ -19,9 +19,15 @@ namespace FloodIt.AI
 
 
             //float[] output = nn.FeedForward(input);
-
             var manager = new NeuroEvolutionManager(builder, poolSize: 20, new() { Size = 4 });
-            await manager.Epochs(n: 1_000);
+            //await manager.Epochs(n: 1_000);
+
+            var best = manager.BestNetwork;
+            string content = best.Save("NN1", true);
+
+            System.Diagnostics.Debug.Write(content);
+
+            var nn = NeuralNetwork.Load("NN1");
         }
 
         static INNBuilder ConfigureNeuralNetwork(INNBuilderInput builderInput)
