@@ -9,13 +9,13 @@ namespace FloodIt.AI.NN
 {
     public class CompiledNeuralNetwork
     {
-        readonly CompiledLayer[] _compiledLayers;
+        readonly CompiledDenseLayer[] _compiledLayers;
 
         public int InputSize { get; }
         public int OutputSize { get; }
-        public ReadOnlyCollection<CompiledLayer> CompiledLayers => new(_compiledLayers);
+        public ReadOnlyCollection<CompiledDenseLayer> CompiledLayers => new(_compiledLayers);
 
-        public CompiledNeuralNetwork(CompiledLayer[] compiledLayers, int inputSize, int outputSize)
+        public CompiledNeuralNetwork(CompiledDenseLayer[] compiledLayers, int inputSize, int outputSize)
         {
             _compiledLayers = compiledLayers;
             InputSize = inputSize;
@@ -36,16 +36,16 @@ namespace FloodIt.AI.NN
 
             return ys;
         }
+    }
 
-        public class CompiledLayer
+    public class CompiledDenseLayer
+    {
+        readonly Func<float[], float[]> _layer;
+        public CompiledDenseLayer(Func<float[], float[]> layer)
         {
-            readonly Func<float[], float[]> _layer;
-            public CompiledLayer(Func<float[], float[]> layer)
-            {
-                _layer = layer;
-            }
-
-            public float[] Compute(float[] xs) => _layer(xs);
+            _layer = layer;
         }
+
+        public float[] Compute(float[] xs) => _layer(xs);
     }
 }

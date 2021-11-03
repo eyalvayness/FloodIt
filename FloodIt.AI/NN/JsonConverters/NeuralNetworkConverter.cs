@@ -12,10 +12,10 @@ namespace FloodIt.AI.NN.JsonConverters
     {
         public override NeuralNetwork? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (options.GetConverter(typeof(NeuralNetwork.Layer)) is not JsonConverter<NeuralNetwork.Layer> layersConverter)
-                throw new JsonException($"Impossible to find a converter for the type {nameof(NeuralNetwork.Layer)}");
+            if (options.GetConverter(typeof(DenseLayer)) is not JsonConverter<DenseLayer> layersConverter)
+                throw new JsonException($"Impossible to find a converter for the type {nameof(DenseLayer)}");
 
-            List<NeuralNetwork.Layer> layers = new();
+            List<DenseLayer> layers = new();
 
             while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
             {
@@ -26,7 +26,7 @@ namespace FloodIt.AI.NN.JsonConverters
                     {
                         while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                         {
-                            var layer = layersConverter.Read(ref reader, typeof(NeuralNetwork.Layer), options);
+                            var layer = layersConverter.Read(ref reader, typeof(DenseLayer), options);
                             _ = layer ?? throw new NullReferenceException();
                             layers.Add(layer);
                         }
@@ -39,8 +39,8 @@ namespace FloodIt.AI.NN.JsonConverters
 
         public override void Write(Utf8JsonWriter writer, NeuralNetwork value, JsonSerializerOptions options)
         {
-            if (options.GetConverter(typeof(NeuralNetwork.Layer)) is not JsonConverter<NeuralNetwork.Layer> layersConverter)
-                throw new JsonException($"Impossible to find a converter for the type {nameof(NeuralNetwork.Layer)}");
+            if (options.GetConverter(typeof(DenseLayer)) is not JsonConverter<DenseLayer> layersConverter)
+                throw new JsonException($"Impossible to find a converter for the type {nameof(DenseLayer)}");
 
             writer.WriteStartObject();
             writer.WriteStartArray(nameof(NeuralNetwork.Layers));

@@ -163,6 +163,7 @@ namespace FloodIt.Core
 
     public record GameSettings
     {
+        public int? Seed { get; init; } = null;
         public int Size { get; init; } = 9;
         public int Count => Size * Size;
         public Brush[] UsedBrushes { get; init; } = new Brush[] { Brushes.Red, Brushes.Yellow, Brushes.Green, Brushes.Orange, Brushes.Magenta, Brushes.Blue, Brushes.Purple, Brushes.DeepSkyBlue };

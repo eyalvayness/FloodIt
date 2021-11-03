@@ -12,6 +12,7 @@ namespace FloodIt.Core
 {
     public class GameState : IEquatable<GameState>, IEquatable<byte[]>
     {
+        readonly Random _rnd;
         readonly Queue<List<Point>> _changes;
         List<Point>? _tempChanges;
         readonly Brush[,] _board;
@@ -55,10 +56,32 @@ namespace FloodIt.Core
             _playableBrushes = Array.Empty<Brush>();
             _simplifiedBoard = new byte[_settings.Count];
             _board = new Brush[_settings.Size, _settings.Size];
+            _rnd = settings.Seed == null ? new() : new(settings.Seed.Value);
 
             Init();
             ComputeBlobs();
             CreateSimplifiedBoard();
+            ComputePlayabelBrushes();
+        }
+
+        private GameState(GameState from)
+        {
+            _blobs = new();
+            _changes = new();
+            _markedULZ = new();
+            _conversionTable = new();
+            _settings = from._settings;
+            _playableBytes = Array.Empty<byte>();
+            _playableBrushes = Array.Empty<Brush>();
+            _simplifiedBoard = from._simplifiedBoard.ToArray();
+            _board = new Brush[_settings.Size, _settings.Size];
+            _rnd = _settings.Seed == null ? new() : new(_settings.Seed.Value);
+
+            for (int x = 0; x < _settings.Size; x++)
+                for (int y = 0; y < _settings.Size; y++)
+                    _board[x, y] = from[x, y];
+
+            ComputeBlobs();
             ComputePlayabelBrushes();
         }
 
@@ -83,26 +106,6 @@ namespace FloodIt.Core
             }
         }
 
-        private GameState(GameState from)
-        {
-            _blobs = new();
-            _changes = new();
-            _markedULZ = new();
-            _conversionTable = new();
-             _settings = from._settings;
-            _playableBytes = Array.Empty<byte>();
-            _playableBrushes = Array.Empty<Brush>();
-            _simplifiedBoard = from._simplifiedBoard.ToArray();
-            _board = new Brush[_settings.Size, _settings.Size];
-
-            for (int x = 0; x < _settings.Size; x++)
-                for (int y = 0; y < _settings.Size; y++)
-                    _board[x, y] = from[x, y];
-
-            ComputeBlobs();
-            ComputePlayabelBrushes();
-        }
-
         internal List<Point>? GetLastChanges() => _changes.Count == 0 ? null : _changes.Dequeue().ToList();
         void BeginBatch()
         {
@@ -123,7 +126,7 @@ namespace FloodIt.Core
             BeginBatch();
             for (int x = 0; x < _settings.Size; x++)
                 for (int y = 0; y < _settings.Size; y++)
-                    this[x, y] = _settings.UsedBrushes.Random();
+                    this[x, y] = _settings.UsedBrushes.Random(_rnd);
             //this[x, y] = _settings.UsedBrushes[_rand.Next(_settings.UsedBrushes.Length)];
             EndBatch();
         }

@@ -8,12 +8,12 @@ using System.Threading.Tasks;
 
 namespace FloodIt.AI.NN.JsonConverters
 {
-    public class LayerConverter : JsonConverter<NeuralNetwork.Layer>
+    public class DenseLayerConverter : JsonConverter<DenseLayer>
     {
         public const string WeightsPropertyName = "Weights";
         public const string BiaisesPropertyName = "Biaises";
 
-        public override NeuralNetwork.Layer? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override DenseLayer Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             int inputSize = -1, outputSize = -1;
             Activations? activation = null;
@@ -25,11 +25,11 @@ namespace FloodIt.AI.NN.JsonConverters
                 {
                     var name = reader.GetString();
                     reader.Read();
-                    if (name == nameof(NeuralNetwork.Layer.InputSize))
+                    if (name == nameof(DenseLayer.InputSize))
                         inputSize = reader.GetInt32();
-                    else if (name == nameof(NeuralNetwork.Layer.OutputSize))
+                    else if (name == nameof(DenseLayer.OutputSize))
                         outputSize = reader.GetInt32();
-                    else if (name == nameof(NeuralNetwork.Layer.Activation))
+                    else if (name == nameof(DenseLayer.Activation))
                         activation = Enum.Parse(typeof(Activations), reader.GetString()!) as Activations?;
                     else if (name == WeightsPropertyName)
                     {
@@ -68,13 +68,13 @@ namespace FloodIt.AI.NN.JsonConverters
             return new(weights, biaises, activation);
         }
 
-        public override void Write(Utf8JsonWriter writer, NeuralNetwork.Layer value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, DenseLayer value, JsonSerializerOptions options)
         {
             writer.WriteStartObject();
 
-            writer.WriteNumber(nameof(NeuralNetwork.Layer.InputSize), value.InputSize);
-            writer.WriteNumber(nameof(NeuralNetwork.Layer.OutputSize), value.OutputSize);
-            writer.WriteString(nameof(NeuralNetwork.Layer.Activation), value.Activation.ToString());
+            writer.WriteNumber(nameof(DenseLayer.InputSize), value.InputSize);
+            writer.WriteNumber(nameof(DenseLayer.OutputSize), value.OutputSize);
+            writer.WriteString(nameof(DenseLayer.Activation), value.Activation.ToString());
 
             writer.WriteStartArray(WeightsPropertyName);
             for (int i = 0; i < value.OutputSize; i++)

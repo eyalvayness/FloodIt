@@ -11,6 +11,7 @@ namespace FloodIt.AI.NN
     public class NeuroEvolutionManager
     {
         readonly NeuroEvolutionPool _networkPool;
+        readonly Random _rnd = new();
 
         public int PoolSize { get; }
 
@@ -36,16 +37,18 @@ namespace FloodIt.AI.NN
         }
 
         async Task<NeuroEvolutionPool.PoolStat> Epoch()
-        { 
-            var runTasks = _networkPool.Select(nn => nn.TrainAsync(maxIteration: 1_000, settings: Settings));
+        {
+            var settings = Settings with { Seed = _rnd.Next() };
+            var runTasks = _networkPool.Select(nn => nn.TrainAsync(1_000, settings));
 
-            await Task.WhenAll(runTasks);
+            var values = await Task.WhenAll(runTasks);
             var stats = _networkPool.ReproduceFromBest();
+
             return stats;
         }
     }
 
-    internal class NeuroEvolutionPool : IEnumerable<NeuralNetwork>, IReadOnlyList<NeuralNetwork>
+    internal class NeuroEvolutionPool : IReadOnlyList<NeuralNetwork>, IEnumerable<NeuralNetwork>
     {
         readonly int _poolSize;
         readonly List<NeuralNetwork> _list;
@@ -95,10 +98,10 @@ namespace FloodIt.AI.NN
 
             public PoolStat(IEnumerable<float> fitnesses)
             {
-                _fitnesses = fitnesses.ToArray();
+                _fitnesses = fitnesses.OrderBy(f => f).ToArray();
 
-                BestFitness = _fitnesses.Max();
-                WorstFitness = _fitnesses.Min(); 
+                BestFitness = _fitnesses[^1];
+                WorstFitness = _fitnesses[0]; 
                 AverageFitness = _fitnesses.Average();
                 MeanFitness = (_fitnesses[(_fitnesses.Length - 1) / 2] + _fitnesses[_fitnesses.Length / 2]) / 2f;
                 PositiveFitnesses = _fitnesses.Count(f => f > 0);
