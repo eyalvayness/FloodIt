@@ -3,8 +3,10 @@ using FloodIt.Core.Interfaces;
 using FloodIt.Core.Utils;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -21,8 +23,9 @@ namespace FloodIt.AI.NN
         public float Fitness { get; private set; }
 
         readonly int[] _layersInfo;
+        readonly Layer[] _layers;
 
-        public Layer[] Layers { get; }
+        public ReadOnlyCollection<Layer> Layers => new(_layers);
         Trainer NNTrainer { get; }
         Player NNPlayer { get; }
 
@@ -31,7 +34,7 @@ namespace FloodIt.AI.NN
             NNTrainer = new(this);
             NNPlayer = new(this);
             _layersInfo = Array.Empty<int>();
-            Layers = Array.Empty<Layer>();
+            _layers = Array.Empty<Layer>();
         }
 
         internal NeuralNetwork(int[] layers, Activation[] activations) : this()
@@ -42,7 +45,7 @@ namespace FloodIt.AI.NN
                 throw new ArgumentException($"Not the good amount of activation functions (received: {activations.Length}, expecting: {layers.Length - 1}).", nameof(activations));
 
             _layersInfo = layers.ToArray();
-            Layers = new Layer[layers.Length - 1];
+            _layers = new Layer[layers.Length - 1];
 
             InitLayers(activations);
         }
@@ -53,23 +56,33 @@ namespace FloodIt.AI.NN
                 throw new ArgumentException($"The Neural Network must have at least 2 different layers.", nameof(layers));
 
             _layersInfo = layers.Select(l => l.InputSize).Append(layers[^1].OutputSize).ToArray();
-            Layers = layers;
+            _layers = layers;
         }
 
         void InitLayers(Activation[] activations)
         {
-            for (int i = 0; i < Layers.Length; i++)
-                Layers[i] = new Layer(_layersInfo[i], _layersInfo[i + 1], activations[i]);
+            for (int i = 0; i < _layers.Length; i++)
+                _layers[i] = new Layer(_layersInfo[i], _layersInfo[i + 1], activations[i]);
         }
 
         //Pre compile nn for predictions
-        void Compile() { }
+        public CompiledNeuralNetwork Compile() 
+        {
+            List<CompiledNeuralNetwork.CompiledLayer> compiledLayers = new();
+            foreach (var layer in _layers)
+            {
+                var func = layer.Compile();
+                compiledLayers.Add(new(func));
+            }
+
+            return new(compiledLayers.ToArray(), InputSize, OutputSize);
+        }
 
 
         NeuralNetwork CreateChild()
         {
-            NeuralNetwork nn = new(this.Layers);
-            foreach (var l in nn.Layers)
+            NeuralNetwork nn = new(this._layers);
+            foreach (var l in nn._layers)
             {
                 l.Evolution();
             }
@@ -92,7 +105,7 @@ namespace FloodIt.AI.NN
         {
             var arr = input;
 
-            foreach (var layer in Layers)
+            foreach (var layer in _layers)
             {
                 arr = layer.FeedForward(arr);
             }
@@ -140,7 +153,7 @@ namespace FloodIt.AI.NN
 
         public override string ToString()
         {
-            return $"F: {Fitness}, L: " + string.Join(" -> ", Layers.Select(l => l.InputSize).Append(Layers[^1].OutputSize));
+            return $"F: {Fitness}, L: " + string.Join(" -> ", _layersInfo);
         }
 
         public override bool Equals(object? obj) => Equals(obj as NeuralNetwork);
@@ -148,14 +161,14 @@ namespace FloodIt.AI.NN
         {
             if (other == null)
                 return false;
-            if (InputSize != other.InputSize || OutputSize != other.OutputSize || Layers.Length != other.Layers.Length)
+            if (InputSize != other.InputSize || OutputSize != other.OutputSize || _layers.Length != other._layers.Length)
                 return false;
-            for (int i = 0; i < Layers.Length; i++)
-                if (Layers[i].Equals(other.Layers[i]) == false)
+            for (int i = 0; i < _layers.Length; i++)
+                if (_layers[i].Equals(other._layers[i]) == false)
                     return false;
             return true;
         }
-        public override int GetHashCode() => HashCode.Combine(InputSize, OutputSize, Layers.Length);
+        public override int GetHashCode() => HashCode.Combine(InputSize, OutputSize, _layers.Length);
 
         public int CompareTo(NeuralNetwork? other)
         {
@@ -445,6 +458,53 @@ namespace FloodIt.AI.NN
             }
 
             public override int GetHashCode() => HashCode.Combine(Activation, InputSize, OutputSize);
+            public Func<float[], float[]> Compile()
+            {
+                var param = Expression.Parameter(typeof(float[]), "xs");
+                var paramsList = new List<ParameterExpression>() { param };
+
+                var ys = Expression.Variable(typeof(float[]), "ys");
+                var activation = Expression.Variable(typeof(Activation), "activation");
+                var varsList = new List<ParameterExpression>() { ys, activation };
+
+                var newArray = Expression.NewArrayBounds(typeof(float), Expression.Constant(OutputSize));
+
+                var activationAssign = Expression.Assign(activation, Expression.Convert(Expression.Constant(Activation, typeof(Activations)), typeof(Activation)));
+                var ysAssign = Expression.Assign(ys, newArray);
+                List<Expression> exprs = new() { ysAssign, activationAssign };
+
+                for (int i = 0; i < OutputSize; i++)
+                {
+                    Expression expr = Expression.Constant(_biaises[i], typeof(float));
+
+
+                    for (int j = 0; j < InputSize; j++)
+                    {
+                        var weight = Expression.Constant(_weights[i, j], typeof(float));
+                        var x = Expression.ArrayAccess(param, Expression.Constant(j, typeof(int)));
+
+                        var right = Expression.Multiply(weight, x);
+                        expr = Expression.Add(expr, right);
+                    }
+
+                    var left = Expression.ArrayAccess(ys, Expression.Constant(i));
+                    var line = Expression.Assign(left, expr);
+                    exprs.Add(line);
+                }
+
+                //var activatedExpr = Expression.Assign(ys, Expression.Call(activation, typeof(NN.Activation).GetMethod("Activate")!, paramsList));
+                //exprs.Add(activatedExpr);
+
+                var returnLabel = Expression.Label(typeof(float[]), "returnYs");
+                var returnExpr = Expression.Return(returnLabel, ys, typeof(float[]));
+                var returnTarget = Expression.Label(returnLabel, Expression.Constant(Array.Empty<float>(), typeof(float[])));
+                exprs.Add(returnExpr);
+                exprs.Add(returnTarget);
+
+                var block = Expression.Block(typeof(float[]), varsList, exprs);
+                var lambda = Expression.Lambda<Func<float[], float[]>>(block, paramsList);
+                return lambda.Compile();
+            }
         }
     }
 }
