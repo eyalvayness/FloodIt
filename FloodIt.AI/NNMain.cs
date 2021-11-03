@@ -12,8 +12,8 @@ namespace FloodIt.AI
     {
         public static async Task Main(string[] args)
         {
-            //await TrainAndSave();
-            Compiled();
+            await TrainAndSave();
+            //Compiled();
         }
 
         static void Compiled()
@@ -40,7 +40,7 @@ namespace FloodIt.AI
             var builder = ConfigureNeuralNetwork(new NNBuilder());
 
             var manager = new NeuroEvolutionManager(builder, poolSize: 20, new() { Size = 4 });
-            await manager.Epochs(n: 100);
+            await manager.Epochs(n: 1_000);
 
             var best = manager.BestNetwork;
             string content = best.Save("NN.json", true);
@@ -49,7 +49,8 @@ namespace FloodIt.AI
         static INNBuilder ConfigureNeuralNetwork(INNBuilderInput builderInput)
         {
             return builderInput.Input(16)
-                               .Dense(13, Activations.LeakyReLU)
+                               .Dense(14, Activations.LeakyReLU)
+                               .Dense(12, Activations.LeakyReLU)
                                .Dense(10, Activations.LeakyReLU)
                                .Dense(7, Activations.Softmax);
             //return builder;
