@@ -138,61 +138,17 @@ namespace FloodIt.AI.NN
                     sb.Append(';');
                     sb.Append(_weights[i, j]);
                 }
-                sb.AppendLine("$");
+                sb.Append('$');
             }
             sb.Append(Activation);
 
             return sb.ToString();
         }
 
-        public Func<float[], float[]> Compile()
+        public CompiledDenseLayer Compile()
         {
             var s = ToString();
-
-            var param = Expression.Parameter(typeof(float[]), "xs");
-            var paramsList = new List<ParameterExpression>() { param };
-
-            var ys = Expression.Variable(typeof(float[]), "ys");
-            var activation = Expression.Variable(typeof(Activation), "activation");
-            var varsList = new List<ParameterExpression>() { ys, activation };
-
-            var newArray = Expression.NewArrayBounds(typeof(float), Expression.Constant(OutputSize));
-
-            var activationAssign = Expression.Assign(activation, Expression.Convert(Expression.Constant(Activation, typeof(Activations)), typeof(Activation)));
-            var ysAssign = Expression.Assign(ys, newArray);
-            List<Expression> exprs = new() { ysAssign, activationAssign };
-
-            for (int i = 0; i < OutputSize; i++)
-            {
-                Expression expr = Expression.Constant(_biaises[i], typeof(float));
-
-                for (int j = 0; j < InputSize; j++)
-                {
-                    var weight = Expression.Constant(_weights[i, j], typeof(float));
-                    var x = Expression.ArrayAccess(param, Expression.Constant(j, typeof(int)));
-
-                    var right = Expression.Multiply(weight, x);
-                    expr = Expression.Add(expr, right);
-                }
-
-                var left = Expression.ArrayAccess(ys, Expression.Constant(i));
-                var line = Expression.Assign(left, expr);
-                exprs.Add(line);
-            }
-
-            var activatedExpr = Expression.Assign(ys, Expression.Call(activation, typeof(Activation).GetMethod("Activate")!, new List<ParameterExpression>() { ys }));
-            exprs.Add(activatedExpr);
-
-            var returnLabel = Expression.Label(typeof(float[]), "returnYs");
-            var returnExpr = Expression.Return(returnLabel, ys, typeof(float[]));
-            var returnTarget = Expression.Label(returnLabel, Expression.Constant(Array.Empty<float>(), typeof(float[])));
-            exprs.Add(returnExpr);
-            exprs.Add(returnTarget);
-
-            var block = Expression.Block(typeof(float[]), varsList, exprs);
-            var lambda = Expression.Lambda<Func<float[], float[]>>(block, paramsList);
-
-            return lambda.Compile();
+            return CompiledDenseLayer.FromFormattedString(s);
         }
 
         internal DenseLayer Clone() => new((float[,])_weights.Clone(), (float[])_biaises.Clone(), Activation);

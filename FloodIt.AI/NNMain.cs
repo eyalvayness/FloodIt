@@ -22,6 +22,13 @@ namespace FloodIt.AI
             if (nn == null)
                 return;
             var compiled = nn.Compile();
+            var c1 = compiled.Save("CNN.json");
+
+            var compiled2 = CompiledNeuralNetwork.Load("CNN.json")!;
+            var c2 = compiled2.Save("CNN2.json");
+
+            var b1 = compiled.Equals(compiled2);
+            var b2 = c1 == c2;
 
             float[] xs = new float[compiled.InputSize];
 

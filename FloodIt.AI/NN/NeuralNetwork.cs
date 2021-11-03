@@ -70,13 +70,12 @@ namespace FloodIt.AI.NN
             List<CompiledDenseLayer> compiledLayers = new();
             foreach (var layer in _layers)
             {
-                var func = layer.Compile();
-                compiledLayers.Add(new(func));
+                var cdl = layer.Compile();
+                compiledLayers.Add(cdl);
             }
 
             return new(compiledLayers.ToArray(), InputSize, OutputSize);
         }
-
 
         NeuralNetwork CreateChild()
         {

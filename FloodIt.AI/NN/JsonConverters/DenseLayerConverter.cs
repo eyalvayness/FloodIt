@@ -30,7 +30,7 @@ namespace FloodIt.AI.NN.JsonConverters
                     else if (name == nameof(DenseLayer.OutputSize))
                         outputSize = reader.GetInt32();
                     else if (name == nameof(DenseLayer.Activation))
-                        activation = Enum.Parse(typeof(Activations), reader.GetString()!) as Activations?;
+                        activation = Enum.Parse<Activations>(reader.GetString()!) as Activations?;
                     else if (name == WeightsPropertyName)
                     {
                         _ = inputSize == -1 ? throw new NullReferenceException() : true;

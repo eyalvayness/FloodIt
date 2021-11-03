@@ -35,9 +35,6 @@ namespace FloodIt.AI.NN
 
         public float[] Activate(float[] fs) => _activation(fs);
 
-        //public static implicit operator Activation(Func<float[], float[]> af) => new(af);
-        //public static implicit operator Activation(Func<float, float> af) => new(af);
-
         public static implicit operator Activation(Activations a) => a switch
         {
             Activations.Identity => Identity,
