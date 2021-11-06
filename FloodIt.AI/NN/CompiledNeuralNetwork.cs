@@ -1,27 +1,56 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using FloodIt.Core;
+using System;
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Linq.Expressions;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Media;
 
 namespace FloodIt.AI.NN
 {
-    public class CompiledNeuralNetwork : IEquatable<CompiledNeuralNetwork?>
+    public partial class CompiledNeuralNetwork : IEquatable<CompiledNeuralNetwork?>
     {
         readonly CompiledDenseLayer[] _compiledLayers;
 
         public int InputSize { get; }
         public int OutputSize { get; }
         public ReadOnlyCollection<CompiledDenseLayer> CompiledLayers => new(_compiledLayers);
+        Player NNPlayer { get; }
 
         public CompiledNeuralNetwork(CompiledDenseLayer[] compiledLayers, int inputSize, int outputSize)
         {
             _compiledLayers = compiledLayers;
             InputSize = inputSize;
             OutputSize = outputSize;
+            NNPlayer = new(this);
+        }
+
+        public Task<int> PlayAsync(GameSettings? settings = null, int maxIteration = 1_000, CancellationToken cancellationToken = default)
+        {
+            settings ??= new();
+
+            if (settings.Count != InputSize)
+                throw new InvalidOperationException($"The board size ({settings.Count}) doesn't match neural network input size ({InputSize}).");
+            if (settings.UsedBrushes.Length != OutputSize + 1)
+                throw new InvalidOperationException($"The neural network output size ({OutputSize}) must be one less than the total number of brushes ({settings.UsedBrushes.Length}).");
+
+            Brush[] board = new Brush[settings.Count];
+            Brush getter(int i) => board[i];
+            void setter(int i, Brush b) => board[i] = b;
+            Game g = new(getter, setter, settings);
+
+            return NNPlayer.PlayAsync(g, maxIteration, cancellationToken);
+        }
+
+        public Task<int> PlayAsync(Game g, int maxIteration = 1_000, CancellationToken cancellationToken = default)
+        {
+            if (g.Settings.Count != InputSize)
+                throw new InvalidOperationException($"The board size ({g.Settings.Count}) doesn't match neural network input size ({InputSize}).");
+            if (g.Settings.UsedBrushes.Length != OutputSize + 1)
+                throw new InvalidOperationException($"The neural network output size ({OutputSize}) must be one less than the total number of brushes ({g.Settings.UsedBrushes.Length}).");
+
+            return NNPlayer.PlayAsync(g, maxIteration, cancellationToken);
         }
 
         public float[] Compute(float[] xs)
@@ -80,76 +109,5 @@ namespace FloodIt.AI.NN
         }
 
         public override int GetHashCode() => HashCode.Combine(InputSize, OutputSize, _compiledLayers.Length);
-    }
-
-    public class CompiledDenseLayer : IEquatable<CompiledDenseLayer?>
-    {
-        readonly Func<float[], float[]> _layer;
-        readonly string _formattedLayerInfo;
-        public CompiledDenseLayer(Func<float[], float[]> layer, string formattedLayerInfo)
-        {
-            _formattedLayerInfo = formattedLayerInfo;
-            _layer = layer;
-        }
-
-        public float[] Compute(float[] xs) => _layer(xs);
-
-        public static CompiledDenseLayer FromFormattedString(string formattedString)
-        {
-            var lines = formattedString.Split('$');
-            int outputSize = lines.Length - 1;
-
-            var param = Expression.Parameter(typeof(float[]), "xs");
-            var paramsList = new List<ParameterExpression>() { param };
-
-            var ys = Expression.Variable(typeof(float[]), "ys");
-            var activation = Expression.Variable(typeof(Activation), "activation");
-            var varsList = new List<ParameterExpression>() { ys, activation };
-
-            var newArray = Expression.NewArrayBounds(typeof(float), Expression.Constant(outputSize));
-
-            var activationAssign = Expression.Assign(activation, Expression.Convert(Expression.Constant(Enum.Parse<Activations>(lines[^1]), typeof(Activations)), typeof(Activation)));
-            var ysAssign = Expression.Assign(ys, newArray);
-            List<Expression> exprs = new() { ysAssign, activationAssign };
-
-            for (int i = 0; i < outputSize; i++)
-            {
-                var columns = lines[i].Split(';').Select(s => float.Parse(s)).ToArray();
-                int inputSize = columns.Length - 1;
-                Expression expr = Expression.Constant(columns[0], typeof(float));
-
-                for (int j = 0; j < inputSize; j++)
-                {
-                    var weight = Expression.Constant(columns[j + 1], typeof(float));
-                    var x = Expression.ArrayAccess(param, Expression.Constant(j, typeof(int)));
-
-                    var right = Expression.Multiply(weight, x);
-                    expr = Expression.Add(expr, right);
-                }
-
-                var left = Expression.ArrayAccess(ys, Expression.Constant(i));
-                var line = Expression.Assign(left, expr);
-                exprs.Add(line);
-            }
-
-            var activatedExpr = Expression.Assign(ys, Expression.Call(activation, typeof(Activation).GetMethod("Activate")!, new List<ParameterExpression>() { ys }));
-            exprs.Add(activatedExpr);
-
-            var returnLabel = Expression.Label(typeof(float[]), "returnYs");
-            var returnExpr = Expression.Return(returnLabel, ys, typeof(float[]));
-            var returnTarget = Expression.Label(returnLabel, Expression.Constant(Array.Empty<float>(), typeof(float[])));
-            exprs.Add(returnExpr);
-            exprs.Add(returnTarget);
-
-            var block = Expression.Block(typeof(float[]), varsList, exprs);
-            var lambda = Expression.Lambda<Func<float[], float[]>>(block, paramsList);
-
-            return new(lambda.Compile(), formattedString);
-        }
-
-        public override bool Equals(object? obj) => Equals(obj as CompiledDenseLayer);
-        public bool Equals(CompiledDenseLayer? other) => other != null && _formattedLayerInfo == other._formattedLayerInfo;
-        public override int GetHashCode() => HashCode.Combine(_formattedLayerInfo);
-        public override string ToString() => _formattedLayerInfo;
     }
 }
