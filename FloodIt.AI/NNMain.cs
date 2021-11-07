@@ -12,8 +12,8 @@ namespace FloodIt.AI
     {
         public static async Task Main(string[] args)
         {
-            //await TrainAndSave();
-            Compiled();
+            await TrainAndSave();
+            //Compiled();
         }
 
         static void Compiled()
@@ -51,6 +51,9 @@ namespace FloodIt.AI
 
             var best = manager.BestNetwork;
             string content = best.Save("NN.json", true);
+
+            var compiled = best.Compile();
+            var c1 = compiled.Save("CNN.json");
         }
 
         static INNBuilder ConfigureNeuralNetwork(INNBuilderInput builderInput)
