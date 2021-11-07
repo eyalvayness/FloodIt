@@ -45,7 +45,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             
             <StackPanel Grid.Column="0" DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Left" Margin="20, 0, 0, 0">
@@ -84,7 +84,20 @@
                     Content="Reset" Command="{Binding RestartCommand}"/>
         </Grid>
 
-        <UniformGrid x:Name="Container" Margin="10" Background="DarkSlateGray">
+        <Grid DockPanel.Dock="Bottom" Margin="10, 0, 10, 5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"  Text="AI:" Margin="0, 0, 3, 0"/>
+            <TextBox Grid.Column="1" Text="{Binding CnnName}" IsReadOnly="True" HorizontalAlignment="Stretch"/>
+            <Button Grid.Column="2" Margin="3, 0" Padding="3, 0" Content="Open" Command="{Binding OpenAICommand}"/>
+            <Button Grid.Column="3" Margin="3, 0" Padding="3, 0" Content="Play" Command="{Binding AIPlayCommand}"/>
+        </Grid>
+
+        <UniformGrid x:Name="Container" Margin="27, 10" Background="DarkSlateGray">
         </UniformGrid>
     </DockPanel>
 </Window>

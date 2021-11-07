@@ -11,21 +11,24 @@ using System.Windows.Shapes;
 using FloodIt.Models;
 using FloodIt.Utils;
 using FloodIt.Core;
-using FloodIt.AI.Q;
+using FloodIt.AI.NN;
+using Microsoft.Win32;
 
 namespace FloodIt.ViewModels
 {
     public class MainWindowViewModel : ObservableObject
     {
-        readonly static int minSize = 6;
+        readonly static int minSize = 4;
         readonly static int maxSize = 12;
         int _size, _moves;
         readonly UniformGrid _container;
         readonly Channel<Brush> _channel;
         Game? _game;
         CancellationTokenSource? source;
-        QLearning? _ai;
+        CompiledNeuralNetwork? _ai;
+        string? _cnnName;
 
+        public string? CnnName { get => _cnnName; set => SetProperty(ref _cnnName, value); }
         public int Size
         {
             get => _size;
@@ -39,6 +42,8 @@ namespace FloodIt.ViewModels
 
         public Command ChangeSizeCommand { get; }
         public Command RestartCommand { get; }
+        public Command OpenAICommand { get; }
+        public Command AIPlayCommand { get; }
 
         public MainWindowViewModel(UniformGrid container)
         {
@@ -46,9 +51,62 @@ namespace FloodIt.ViewModels
             _channel = Channel.CreateUnbounded<Brush>(new UnboundedChannelOptions());
             ChangeSizeCommand = new(ChangeSize, CanChangeSize);
             RestartCommand = new(Restart);
+            OpenAICommand = new(OpenAI, CanOpenAI);
+            AIPlayCommand = new(AIPlay, CanAIPlay);
 
             Moves = 0;
-            Size = (minSize + maxSize) / 2;
+            Size = 4;// (minSize + maxSize) / 2;
+        }
+
+        bool CanOpenAI() => true;
+        void OpenAI()
+        {
+            var dialog = new OpenFileDialog()
+            {
+                Multiselect = false,
+                Title = "Choose a serialized Compiled NN"
+            };
+            if (dialog.ShowDialog() == true)
+            {
+                CnnName = dialog.SafeFileName;
+                _ai = CompiledNeuralNetwork.Load(dialog.FileName);
+                if (_ai == null)
+                {
+                    System.Windows.MessageBox.Show($"Error while tryingh to open file {dialog.FileName}", "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                    return;
+                }
+            }
+        }
+
+        bool CanAIPlay() => _ai != null;
+        async void AIPlay()
+        {
+            if (source != null)
+            {
+                source.Cancel(false);
+                source.Dispose();
+            }
+            source = new();
+
+            var settings = new GameSettings() { Size = Size };
+            var rectCreation = new BasicRectangleCreation();
+
+            _container.Children.Clear();
+            for (int i = 0; i < settings.Count; i++)
+                _container.Children.Add(rectCreation.GetNewRectangle());
+
+            _game = new Game(GetBrush, SetBrush, settings);
+            Moves = 0;
+            _game.OnBrushPlayed += (e, b) => Moves++;
+
+            try
+            {
+                await _ai!.PlayAsync(_game, 1000, source.Token);
+                //System.Windows.MessageBox.Show($"The AI finished in {Moves} move(s)! With {averageR:0.##} as average reward!", "GG", System.Windows.MessageBoxButton.OK);
+                //App.Current.Dispatcher.Invoke(CreateNewGame);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception) { }
         }
 
         void Restart() => Size = _size;
@@ -60,7 +118,7 @@ namespace FloodIt.ViewModels
                 source.Dispose();
             }
             source = new();
-            while (_channel.Reader.TryRead(out Brush? _));
+            while (_channel.Reader.TryRead(out Brush? _)) ;
 
 
             var settings = new GameSettings() { Size = Size };
@@ -70,7 +128,6 @@ namespace FloodIt.ViewModels
             for (int i = 0; i < settings.Count; i++)
                 _container.Children.Add(rectCreation.GetNewRectangle());
 
-            _ai = new QLearning(0.5f, 0.99f, settings);
             _game = new Game(GetBrush, SetBrush, settings);
             Moves = 0;
             _game.OnBrushPlayed += (e, b) => Moves++;
@@ -91,8 +148,8 @@ namespace FloodIt.ViewModels
             //    catch (OperationCanceledException) { }
             //    catch (Exception) { }
             //});        
-            try 
-            { 
+            try
+            {
                 bool won = await _game.StartGameAsync(new UserStrategy(_channel.Reader), colorAsync: true, cancellationToken: source.Token);
                 if (won)
                     System.Windows.MessageBox.Show($"You won in {Moves} move(s)!", "GG", System.Windows.MessageBoxButton.OK);
@@ -126,7 +183,7 @@ namespace FloodIt.ViewModels
     public class UserStrategy : Core.Interfaces.IAsyncStrategy
     {
         readonly ChannelReader<Brush> _reader;
-        
+
         public UserStrategy(ChannelReader<Brush> reader)
         {
             _reader = reader;
@@ -136,7 +193,7 @@ namespace FloodIt.ViewModels
         {
             await _reader.WaitToReadAsync(cancellationToken);
             Brush b = await _reader.ReadAsync(cancellationToken);
-            
+
             return b;
         }
     }

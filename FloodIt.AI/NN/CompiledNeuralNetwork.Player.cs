@@ -40,7 +40,9 @@ namespace FloodIt.AI.NN
                 return _currentCount;
             }
 
-            Brush? IStrategy.Play(GameState state)
+            Brush? IStrategy.Play(GameState state) => CommonPlay(state);
+
+            Brush? CommonPlay(GameState state)
             {
                 if (++_currentCount >= _currentMaxIteration)
                 {
@@ -60,27 +62,11 @@ namespace FloodIt.AI.NN
                 return b;
             }
 
-            Task<Brush?> IAsyncStrategy.PlayAsync(GameState state, CancellationToken cancellationToken)
+            async Task<Brush?> IAsyncStrategy.PlayAsync(GameState state, CancellationToken cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return Task.FromResult(((IStrategy)this).Play(state));
-                //if (++_currentCount >= _currentMaxIteration)
-                //{
-                //    return Task.FromResult<Brush?>(null);
-                //}
-                //float[] xs = state.SimplifiedBoard.Select(b => (float)b).ToArray();
-
-                //var ys = Parent.Compute(xs);
-                //var maxV = ys.Max();
-                //var index = (byte)(ys.ToList().IndexOf(maxV) + 1);
-
-                //Brush? b = null;
-                //if (state.PlayableBytes.Contains(index))
-                //    b = state.GetBrushFromByte(index);
-                //else
-                //    b = state.PlayableBrushes.Random();
-
-                //return Task.FromResult<Brush?>(b);
+                await Task.Delay(1000, cancellationToken);
+                return CommonPlay(state);
             }
         }
     }
