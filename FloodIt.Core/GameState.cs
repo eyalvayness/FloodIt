@@ -317,6 +317,6 @@ namespace FloodIt.Core
             return true;
         }
 
-        public int GetHashCode([DisallowNull] byte[] obj) => obj.Sum(b => b);
+        public int GetHashCode([DisallowNull] byte[] obj) => HashCode.Combine(obj.Length, Array.LastIndexOf(obj, 0));
     }
 }
