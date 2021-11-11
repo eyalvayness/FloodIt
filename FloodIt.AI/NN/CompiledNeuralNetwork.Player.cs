@@ -14,15 +14,16 @@ namespace FloodIt.AI.NN
     {
         private class Player : IStrategy, IAsyncStrategy
         {
+            public readonly TimeSpan DefaultPauseSpan = TimeSpan.FromSeconds(1);
+
             readonly WeakReference<CompiledNeuralNetwork> _parent;
             List<int> _lastStates;
             int _currentULZCount;
-
-            CompiledNeuralNetwork Parent => _parent.TryGetTarget(out var parent) ? parent : throw new NullReferenceException($"{nameof(Parent)} has been collected by GC");
-
-
+            TimeSpan _pauseSpan;
             int _currentCount = 0;
             int _currentMaxIteration = 1_000;
+
+            CompiledNeuralNetwork Parent => _parent.TryGetTarget(out var parent) ? parent : throw new NullReferenceException($"{nameof(Parent)} has been collected by GC");
 
             public Player(CompiledNeuralNetwork parent)
             {
@@ -30,22 +31,24 @@ namespace FloodIt.AI.NN
                 _lastStates = new();
             }
 
-            public int Play(Game g, int maxIteration = 1_000)
+            public int Play(Game g, TimeSpan? pauseSpan = null, int maxIteration = 1_000)
             {
                 _currentCount = 0;
                 _currentMaxIteration = maxIteration;
                 _lastStates = new();
                 _currentULZCount = -1;
+                _pauseSpan = pauseSpan ?? DefaultPauseSpan;
                 g.StartGame(this);
                 return _currentCount;
             }
 
-            public async Task<int> PlayAsync(Game g, int maxIteration = 1_000, CancellationToken cancellationToken = default)
+            public async Task<int> PlayAsync(Game g, TimeSpan? pauseSpan = null, int maxIteration = 1_000, CancellationToken cancellationToken = default)
             {
                 _currentCount = 0;
                 _currentMaxIteration = maxIteration;
                 _lastStates = new();
                 _currentULZCount = -1;
+                _pauseSpan = pauseSpan ?? DefaultPauseSpan;
                 await g.StartGameAsync(this, false, cancellationToken);
                 return _currentCount;
             }
@@ -96,7 +99,7 @@ namespace FloodIt.AI.NN
             async Task<Brush?> IAsyncStrategy.PlayAsync(GameState state, CancellationToken cancellationToken)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                await Task.Delay(1000, cancellationToken);
+                await Task.Delay(_pauseSpan, cancellationToken);
                 return CommonPlay(state);
             }
         }

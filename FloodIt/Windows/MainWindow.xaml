@@ -91,10 +91,16 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
             <TextBlock Grid.Column="0"  Text="AI:" Margin="0, 0, 3, 0"/>
             <TextBox Grid.Column="1" Text="{Binding CnnName}" IsReadOnly="True" HorizontalAlignment="Stretch"/>
             <Button Grid.Column="2" Margin="3, 0" Padding="3, 0" Content="Open" Command="{Binding OpenAICommand}"/>
             <Button Grid.Column="3" Margin="3, 0" Padding="3, 0" Content="Play" Command="{Binding AIPlayCommand}"/>
+
+            <Button Grid.Column="2" Grid.Row="1" Grid.ColumnSpan="2" Content="M.C. Play" Command="{Binding MCPlayCommand}" Margin="3" Padding="3, 0"/>
         </Grid>
 
         <UniformGrid x:Name="Container" Margin="27, 10" Background="DarkSlateGray">

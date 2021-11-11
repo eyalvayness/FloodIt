@@ -40,7 +40,7 @@ namespace FloodIt.AI.NN
             void setter(int i, Brush b) => board[i] = b;
             Game g = new(getter, setter, settings);
 
-            return NNPlayer.PlayAsync(g, maxIteration, cancellationToken);
+            return NNPlayer.PlayAsync(g, null, maxIteration, cancellationToken);
         }
 
         public Task<int> PlayAsync(Game g, int maxIteration = 1_000, CancellationToken cancellationToken = default)
@@ -50,7 +50,7 @@ namespace FloodIt.AI.NN
             if (g.Settings.UsedBrushes.Length != OutputSize + 1)
                 throw new InvalidOperationException($"The neural network output size ({OutputSize}) must be one less than the total number of brushes ({g.Settings.UsedBrushes.Length}).");
 
-            return NNPlayer.PlayAsync(g, maxIteration, cancellationToken);
+            return NNPlayer.PlayAsync(g, null, maxIteration, cancellationToken);
         }
 
         public float[] Compute(float[] xs)

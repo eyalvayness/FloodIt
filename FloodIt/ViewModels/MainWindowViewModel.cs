@@ -44,6 +44,7 @@ namespace FloodIt.ViewModels
         public Command RestartCommand { get; }
         public Command OpenAICommand { get; }
         public Command AIPlayCommand { get; }
+        public Command MCPlayCommand { get; }
 
         public MainWindowViewModel(UniformGrid container)
         {
@@ -53,9 +54,40 @@ namespace FloodIt.ViewModels
             RestartCommand = new(Restart);
             OpenAICommand = new(OpenAI, CanOpenAI);
             AIPlayCommand = new(AIPlay, CanAIPlay);
+            MCPlayCommand = new(MCPlay, CanMCPlay);
 
             Moves = 0;
             Size = 4;// (minSize + maxSize) / 2;
+        }
+
+        bool CanMCPlay() => true;
+        async void MCPlay()
+        {
+            var mc = new AI.Algos.MonteCarlo();
+            var settings = new GameSettings() { Size = Size };
+            var rectCreation = new BasicRectangleCreation();
+
+            if (source != null)
+            {
+                source.Cancel(false);
+                source.Dispose();
+            }
+            source = new();
+
+            _container.Children.Clear();
+            for (int i = 0; i < settings.Count; i++)
+                _container.Children.Add(rectCreation.GetNewRectangle());
+
+            _game = new Game(GetBrush, SetBrush, settings);
+            Moves = 0;
+            _game.OnBrushPlayed += (e, b) => Moves++;
+
+            try
+            {
+                await _game.StartGameAsync(mc, false, source.Token);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception) { }
         }
 
         bool CanOpenAI() => true;

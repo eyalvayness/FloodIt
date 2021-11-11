@@ -91,6 +91,11 @@ namespace FloodIt.AI.NN
                 return Task.FromResult<Brush?>(b);
             }
 
+            const float b = -1;
+            const float uzlFact = 1;
+            const float blobsFact = 1;
+            const float colorsFact = 2;
+            const float endFact = 3;
             static float ComputeFitness(GameState oldState, Brush playedBrush)
             {
                 GameState newState = oldState.PlayBrush(playedBrush);
@@ -100,18 +105,8 @@ namespace FloodIt.AI.NN
                 int colors = -(newState.PlayableBrushCount - oldState.PlayableBrushCount);
                 int end = Convert.ToInt32(newState.IsFinished);
 
-                float b = -1;// Can be changed to 0
-                float uzlFact = 1;
-                float blobsFact = 1;
-                float colorsFact = 2;
-                float endFact = 3;
 
-                float r = uzl * uzlFact + blobs * blobsFact + colors * colorsFact + end * endFact + b;
-                if (r != -1 && oldState == newState)
-                {
-
-                }
-
+                float r = (uzl * uzlFact) + (blobs * blobsFact) + (colors * colorsFact) + (end * endFact) + b;
                 return r;
             }
         }

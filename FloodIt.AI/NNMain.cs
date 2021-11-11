@@ -46,8 +46,8 @@ namespace FloodIt.AI
         {
             var builder = ConfigureNeuralNetwork(new NNBuilder());
 
-            var manager = new NeuroEvolutionManager(builder, poolSize: 20, new() { Size = 4 });
-            await manager.Epochs(n: 20);
+            var manager = new NeuroEvolutionManager(builder, 20, new() { Size = 4 });
+            await manager.Epochs(20);
 
             var best = manager.BestNetwork;
             string content = best.Save("NN.json", true);
